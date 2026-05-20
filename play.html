@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=240,initial-scale=1.0,user-scalable=no">
+<title>R1GBA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{
+  width:240px;height:282px;overflow:hidden;
+  background:#0e0e10;
+  -webkit-user-select:none;user-select:none;
+}
+#game{
+  position:absolute;
+  width:282px;height:240px;
+  left:-21px;top:21px;
+  transform:rotate(-90deg);
+  transform-origin:center center;
+  background:#000;
+}
+#game canvas{display:block;width:100%!important;height:100%!important;image-rendering:pixelated}
+#status{
+  position:absolute;bottom:0;left:0;right:0;height:14px;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.85);z-index:9999;
+  font:7px/14px -apple-system,sans-serif;
+  color:rgba(255,255,255,0.4);letter-spacing:1px;
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+<div id="status"></div>
+
+<script>
+// ─── Parse ROM URL from query string ───
+var romUrl = '';
+var m = location.search.match(/[?&]rom=([^&]+)/);
+if (m) {
+  romUrl = decodeURIComponent(m[1]);
+  // If it looks like a raw file ID (not a URL), assume Google Drive
+  if (!romUrl.match(/^https?:\/\//) && romUrl.match(/^[a-zA-Z0-9_-]+$/)) {
+    romUrl = 'https://drive.usercontent.google.com/download?id=' + romUrl + '&export=download';
+  }
+}
+
+// ─── EmulatorJS Config (MUST be set before loader.js loads) ───
+EJS_player = '#game';
+EJS_core = 'gba';
+EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+EJS_gameUrl = romUrl;
+EJS_startOnLoaded = true;
+EJS_forceLegacyCores = true; // avoid SharedArrayBuffer requirement
+EJS_volume = 0.5;
+
+// Hide all UI buttons for clean R1 screen
+EJS_Buttons = {
+  playPause: false, restart: false, mute: false, settings: false,
+  fullscreen: false, saveState: false, loadState: false, screenRecord: false,
+  gamepad: false, cheat: false, volume: false, saveSavFiles: false,
+  loadSavFiles: false, quickSave: false, quickLoad: false, screenshot: false
+};
+
+// ─── EmulatorJS Keyboard Dispatch ───
+// GBA mapping: A=z, B=x, Select=Shift, Start=Enter, Arrows, L=q, R=e
+function kd(key) {
+  document.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:key, bubbles:true}));
+}
+function ku(key) {
+  document.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:key, bubbles:true}));
+}
+function tap(key, ms) {
+  kd(key); setTimeout(function(){ ku(key); }, ms || 80);
+}
+
+// ─── R1 Controls ───
+var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
+var touchDirs = {}, touchActive = false;
+var SUPER_LONG_MS = 2000, superLongTimer = null;
+
+// Side click: 1=A, 2=B, 3=Start
+window.addEventListener('sideClick', function(){
+  if (longHeld) return;
+  var now = Date.now();
+  clearTimeout(sideTimer);
+  sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
+  lastSide = now;
+  sideTimer = setTimeout(function(){
+    if (sideCount === 1)      tap('z', 60);
+    else if (sideCount === 2) tap('x', 60);
+    else                      tap('Enter', 60);
+    sideCount = 0;
+  }, 350);
+});
+
+// Long press = Select. Super long = back to menu
+window.addEventListener('longPressStart', function(){
+  longHeld = true;
+  kd('Shift');
+  superLongTimer = setTimeout(function(){
+    if (longHeld) {
+      ku('Shift');
+      window.location.href = 'index.html';
+    }
+  }, SUPER_LONG_MS);
+});
+window.addEventListener('longPressEnd', function(){
+  longHeld = false;
+  clearTimeout(superLongTimer);
+  ku('Shift');
+});
+
+// Scroll = D-Pad right/left
+window.addEventListener('scrollUp',   function(){ tap('ArrowRight', 120); });
+window.addEventListener('scrollDown', function(){ tap('ArrowLeft', 120); });
+
+// Touch zones for D-Pad (same rotated mapping as before)
+document.addEventListener('pointerdown', function(e){
+  touchActive = true; updateTouch(e);
+});
+document.addEventListener('pointermove', function(e){
+  if (touchActive) updateTouch(e);
+});
+document.addEventListener('pointerup', function(){
+  touchActive = false; releaseTouch();
+});
+document.addEventListener('pointercancel', function(){
+  touchActive = false; releaseTouch();
+});
+
+function updateTouch(e) {
+  var px = Math.max(0, Math.min(240, e.clientX));
+  var py = Math.max(0, Math.min(282, e.clientY));
+  var nd = {};
+  if (py < 80)  nd['ArrowRight'] = true;  // physical top → game RIGHT
+  if (py > 200) nd['ArrowLeft'] = true;    // physical bottom → game LEFT
+  if (px < 70)  nd['ArrowUp'] = true;      // physical left → game UP
+  if (px > 170) nd['ArrowDown'] = true;    // physical right → game DOWN
+  for (var k in nd)  { if (!touchDirs[k]) kd(k); }
+  for (var k in touchDirs) { if (!nd[k]) ku(k); }
+  touchDirs = nd;
+}
+function releaseTouch() {
+  for (var k in touchDirs) ku(k);
+  touchDirs = {};
+}
+
+// ─── Audio context resume ───
+function resumeAudio() {
+  try {
+    var ac = window.AudioContext;
+    if (ac && ac.prototype && ac.prototype.state !== undefined) {
+      // EmulatorJS stores its AudioContext internally; try common patterns
+      var ctx = document.createElement('audio').context;
+      if (ctx && ctx.state === 'suspended') ctx.resume();
+    }
+  } catch(e) {}
+}
+window.addEventListener('sideClick', resumeAudio);
+window.addEventListener('scrollUp', resumeAudio);
+window.addEventListener('scrollDown', resumeAudio);
+document.addEventListener('pointerdown', resumeAudio);
+</script>
+<script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+</body>
+</html>

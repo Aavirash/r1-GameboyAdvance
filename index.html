@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=240,initial-scale=1.0,user-scalable=no">
+<title>R1GBA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  width:240px;height:282px;overflow:hidden;
+  background:#0e0e10;
+  font-family:-apple-system,sans-serif;
+  -webkit-user-select:none;user-select:none;
+  position:relative;
+}
+#menu-screen{
+  position:absolute;top:0;left:0;width:240px;height:282px;
+  display:flex;flex-direction:column;background:#0e0e10;z-index:100;
+}
+#menu-header{
+  padding:8px 10px 6px;
+  border-bottom:1px solid rgba(254,80,0,0.18);
+  font-size:11px;font-weight:700;letter-spacing:2px;
+  color:#FE5000;text-align:center;flex-shrink:0;
+}
+#menu-list-wrap{flex:1;overflow:hidden;position:relative}
+#menu-list{position:absolute;top:0;left:0;right:0;transition:transform .15s ease}
+.menu-item{
+  padding:8px 12px;font-size:11px;color:rgba(255,255,255,0.55);
+  border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;
+}
+.menu-item.selected{
+  color:#fff;background:rgba(254,80,0,0.12);
+  border-left:2px solid #FE5000;
+}
+#menu-footer{
+  padding:4px 8px;font-size:7px;color:rgba(255,255,255,0.2);
+  text-align:center;letter-spacing:0.5px;flex-shrink:0;
+}
+#loading{
+  position:absolute;top:0;left:0;width:240px;height:282px;
+  display:none;align-items:center;justify-content:center;
+  background:#0e0e10;z-index:200;flex-direction:column;gap:10px;
+}
+#loading-text{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:1px}
+</style>
+</head>
+<body>
+
+<div id="loading"><div id="loading-text">R1GBA</div></div>
+
+<div id="menu-screen">
+  <div id="menu-header">SELECT GAME</div>
+  <div id="menu-list-wrap"><div id="menu-list"></div></div>
+  <div id="menu-footer">SCROLL choose · SIDE CLICK select</div>
+</div>
+
+<script>
+var GAMES = [
+  {id:'drive',         name:'Pokemon Ruby (Google Drive)', url:'https://drive.usercontent.google.com/download?id=1FbEqcGsXb8NbK1ykFaEe4eqLk7NAS7tU&export=download'},
+  {id:'pokemonruby',   name:'Pokemon Ruby'},
+  {id:'pokemonsapphire',name:'Pokemon Sapphire'},
+  {id:'pokemonemerald', name:'Pokemon Emerald'},
+  {id:'pokemonred',     name:'Pokemon FireRed'},
+  {id:'pokemongreen',   name:'Pokemon LeafGreen'},
+  {id:'zelda_minish',   name:'Zelda: Minish Cap'},
+  {id:'zelda_past',     name:'Zelda: Link to the Past'},
+  {id:'mariokart',      name:'Mario Kart Super Circuit'},
+  {id:'supermarioadvance', name:'Super Mario Advance'},
+  {id:'metroid_fusion', name:'Metroid Fusion'},
+  {id:'goldensun',      name:'Golden Sun'},
+  {id:'ff1and2',        name:'Final Fantasy I & II'},
+  {id:'ff6',            name:'Final Fantasy VI Advance'},
+  {id:'warioland4',     name:'Wario Land 4'},
+  {id:'sonic_advance',  name:'Sonic Advance'},
+  {id:'advancewars',    name:'Advance Wars'},
+  {id:'drilldozer',     name:'Drill Dozer'},
+  {id:'dbz_supersonic', name:'DBZ Supersonic'},
+  {id:'fzero_gp',       name:'F-Zero GP Legend'},
+  {id:'kirbynightmare', name:'Kirby Nightmare'},
+  {id:'megaman_zero1',  name:'Megaman Zero'},
+  {id:'metalslug',      name:'Metal Slug Advance'},
+  {id:'tetris_worlds',  name:'Tetris Worlds'},
+  {id:'fzero_max',      name:'F-Zero Max Velocity'}
+];
+
+var ROM_BASE = 'https://gba.js.org/binaries/';
+var $loading = document.getElementById('loading');
+var $menu = document.getElementById('menu-screen');
+var $menuList = document.getElementById('menu-list');
+var menuIndex = 0;
+
+function buildMenu() {
+  var html = '';
+  for (var i=0;i<GAMES.length;i++) {
+    html += '<div class="menu-item" data-idx="'+i+'">'+GAMES[i].name+'</div>';
+  }
+  $menuList.innerHTML = html;
+  var items = $menuList.querySelectorAll('.menu-item');
+  for (var j=0;j<items.length;j++) {
+    items[j].addEventListener('pointerdown', function(){
+      menuIndex = parseInt(this.getAttribute('data-idx'));
+      renderMenu();
+    });
+    items[j].addEventListener('pointerup', function(){
+      var idx = parseInt(this.getAttribute('data-idx'));
+      if (menuIndex === idx) selectGame(idx);
+    });
+  }
+  renderMenu();
+  $loading.style.display = 'none';
+}
+
+function renderMenu() {
+  var items = $menuList.querySelectorAll('.menu-item');
+  for (var i=0;i<items.length;i++){
+    items[i].classList.toggle('selected', i===menuIndex);
+  }
+  var itemH = 28, viewH = 230;
+  var maxScroll = Math.max(0, (items.length * itemH) - viewH);
+  var target = Math.min(maxScroll, Math.max(0, menuIndex * itemH - viewH/2 + itemH/2));
+  $menuList.style.transform = 'translateY(-'+target+'px)';
+}
+
+function selectGame(idx) {
+  if (idx < 0 || idx >= GAMES.length) return;
+  var g = GAMES[idx];
+  var romUrl = g.url || (ROM_BASE + g.id + '.gba');
+  window.location.href = 'play.html?rom=' + encodeURIComponent(romUrl);
+}
+
+function menuUp()   { if (menuIndex > 0) { menuIndex--; renderMenu(); } }
+function menuDown() { if (menuIndex < GAMES.length-1) { menuIndex++; renderMenu(); } }
+
+function setupR1Controls() {
+  window.addEventListener('sideClick', function(){ selectGame(menuIndex); });
+  window.addEventListener('scrollUp',   menuUp);
+  window.addEventListener('scrollDown', menuDown);
+  window.addEventListener('longPressStart', function(){ selectGame(menuIndex); });
+}
+
+function setupKeyboard() {
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowUp')    menuUp();
+    if (e.key === 'ArrowDown')  menuDown();
+    if (e.key === 'Enter')      selectGame(menuIndex);
+  });
+}
+
+// Boot
+(function init(){
+  buildMenu();
+  setupR1Controls();
+  setupKeyboard();
+})();
+</script>
+</body>
+</html>
