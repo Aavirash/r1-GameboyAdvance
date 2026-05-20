@@ -20,26 +20,21 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   overflow:hidden;
 }
 #game canvas{width:100%!important;height:100%!important}
+#game .ejs_canvas{width:100%!important;height:100%!important}
+.ejs_parent{display:flex!important}
+.ejs_parent canvas{width:100%!important;height:100%!important}
 /* Hide virtual gamepad */
-#game .ejs_virtual_gamepad,
-#game .ejs_virtualGamepad,
-#game [class*="virtualGamepad"],
-#game [class*="virtual_gamepad"],
-#game [class*="VirtualGamepad"],
-#game .ejs_gamepad,
-#game .ejs_gamepad_parent,
-#game .ejs_dpad,
-#game .ejs_button,
-#game .ejs_start_button,
-.ejs_virtual_gamepad,
-.ejs_virtualGamepad,
-[class*="virtualGamepad"],
-[class*="virtual_gamepad"] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
+#game [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+#game [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+#game [class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+#game [class*="dpad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+#game [class*="Dpad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+#game [class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="virtualGamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="virtual_gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="ejs_virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+/* Hide bottom bar */
+#game .ejs_bottom_bar{display:none!important}
 </style>
 </head>
 <body>
@@ -73,29 +68,73 @@ EJS_Buttons = {
 
 EJS_VirtualGamepadSettings = [];
 
-// ─── Direct input via simulateInput ───
-// Button indices: 0=B, 1=Y, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A, 9=X, 10=L, 11=R
+// ─── Input system ───
+// Button indices: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
+// keyMap: z=90, x=88, enter=13, shift=16, arrows=37-40
 var gm = null;
+var inputReady = false;
 
-// EJS_onGameStart fires AFTER the game is running and gameManager exists
+// Method 1: simulateInput (direct WASM call)
+function simPress(btn) {
+  if (gm) { try { gm.simulateInput(0, btn, 1); return true; } catch(e) {} }
+  return false;
+}
+function simRelease(btn) {
+  if (gm) { try { gm.simulateInput(0, btn, 0); return true; } catch(e) {} }
+  return false;
+}
+
+// Method 2: Keyboard dispatch with correct keyCodes (fallback)
+// EmulatorJS keyChange compares this.controls[i][j].value === e.keyCode
+// After setupKeys(), values are numeric keyCodes
+function keyPress(key, keyCode) {
+  var t = document.querySelector('#game');
+  if (!t) return;
+  t.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:key==='z'?'KeyZ':key==='x'?'KeyX':key==='Enter'?'Enter':key==='Shift'?'ShiftLeft':key, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
+}
+function keyRelease(key, keyCode) {
+  var t = document.querySelector('#game');
+  if (!t) return;
+  t.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:key==='z'?'KeyZ':key==='x'?'KeyX':key==='Enter'?'Enter':key==='Shift'?'ShiftLeft':key, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
+}
+
+// Combined press/release - try simulateInput first, fall back to keyboard
+function press(btn, key, keyCode) {
+  if (!simPress(btn)) keyPress(key, keyCode);
+}
+function release(btn, key, keyCode) {
+  if (!simRelease(btn)) keyRelease(key, keyCode);
+}
+function tap(btn, key, keyCode, ms) {
+  press(btn, key, keyCode);
+  setTimeout(function(){ release(btn, key, keyCode); }, ms || 80);
+}
+
+// Wait for gameManager to be available
+function waitForGM(cb) {
+  if (gm) { cb(); return; }
+  var tries = 0;
+  var check = setInterval(function() {
+    tries++;
+    try {
+      gm = window.EJS_emulator && window.EJS_emulator.gameManager;
+    } catch(e) {}
+    if (gm) { clearInterval(check); cb(); }
+    if (tries > 60) { clearInterval(check); } // 30 seconds
+  }, 500);
+}
+
 EJS_onGameStart = function() {
-  try {
-    gm = window.EJS_emulator.gameManager;
-  } catch(e) {
-    // Fallback: keep trying
-    var tryGm = setInterval(function() {
-      try {
-        gm = window.EJS_emulator.gameManager;
-        if (gm) clearInterval(tryGm);
-      } catch(e2) {}
-    }, 500);
-  }
-  // Hide virtual gamepad elements
+  waitForGM(function() {
+    inputReady = true;
+  });
+  // Aggressively hide virtual gamepad
   setInterval(function() {
-    var all = document.querySelectorAll('*');
+    var all = document.querySelectorAll('#game *');
     for (var i = 0; i < all.length; i++) {
-      var c = all[i].className;
-      if (typeof c === 'string' && (c.indexOf('virtual') >= 0 || c.indexOf('gamepad') >= 0 || c.indexOf('Gamepad') >= 0 || c.indexOf('dpad') >= 0 || c.indexOf('Dpad') >= 0)) {
+      var c = all[i].className || '';
+      var t = all[i].tagName || '';
+      if (typeof c === 'string' && (c.indexOf('virtual') >= 0 || c.indexOf('gamepad') >= 0 || c.indexOf('Gamepad') >= 0 || c.indexOf('nipple') >= 0 || c.indexOf('dpad') >= 0 || c.indexOf('Dpad') >= 0)) {
         all[i].style.display = 'none';
         all[i].style.visibility = 'hidden';
         all[i].style.pointerEvents = 'none';
@@ -104,19 +143,11 @@ EJS_onGameStart = function() {
   }, 200);
 };
 
-// Direct simulateInput: player=0, btn=index, value=1 press / 0 release
-function press(btn) { if (gm) gm.simulateInput(0, btn, 1); }
-function release(btn) { if (gm) gm.simulateInput(0, btn, 0); }
-function tap(btn, ms) {
-  press(btn);
-  setTimeout(function(){ release(btn); }, ms || 80);
-}
-
 // ─── R1 Controls ───
 var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
 var SUPER_LONG_MS = 2000, superLongTimer = null;
 
-// PTT: 1=A(8), 2=B(0)
+// PTT: 1=A(8,z,90), 2=B(0,x,88)
 window.addEventListener('sideClick', function(){
   if (longHeld) return;
   var now = Date.now();
@@ -124,19 +155,19 @@ window.addEventListener('sideClick', function(){
   sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
   lastSide = now;
   sideTimer = setTimeout(function(){
-    if (sideCount === 1) tap(8, 80);      // A
-    else if (sideCount === 2) tap(0, 80);  // B
+    if (sideCount === 1) tap(8, 'z', 90, 80);       // A
+    else if (sideCount === 2) tap(0, 'x', 88, 80);   // B
     sideCount = 0;
   }, 350);
 });
 
-// Long press = Start(3). Super long (2s) = back to menu
+// Long press = Start(3,enter,13). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
-  press(3); // START
+  press(3, 'Enter', 13);
   superLongTimer = setTimeout(function(){
     if (longHeld) {
-      release(3);
+      release(3, 'Enter', 13);
       window.location.href = 'index.html';
     }
   }, SUPER_LONG_MS);
@@ -144,22 +175,23 @@ window.addEventListener('longPressStart', function(){
 window.addEventListener('longPressEnd', function(){
   longHeld = false;
   clearTimeout(superLongTimer);
-  release(3); // START release
+  release(3, 'Enter', 13);
 });
 
 // ─── Scroll = D-pad ───
-window.addEventListener('scrollDown', function(){ tap(7, 120); }); // RIGHT
-window.addEventListener('scrollUp',   function(){ tap(6, 120); }); // LEFT
+window.addEventListener('scrollDown', function(){ tap(7, 'ArrowRight', 39, 120); }); // RIGHT
+window.addEventListener('scrollUp',   function(){ tap(6, 'ArrowLeft', 37, 120); });   // LEFT
 
 // ─── Touch D-Pad ───
+// Button mapping: 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT
+// KeyCodes: UP=38, DOWN=40, LEFT=37, RIGHT=39
+var touchMap = {4:{key:'ArrowUp',kc:38}, 5:{key:'ArrowDown',kc:40}, 6:{key:'ArrowLeft',kc:37}, 7:{key:'ArrowRight',kc:39}};
 var touchDirs = {}, touchActive = false;
 document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
 document.addEventListener('pointermove', function(e){ if(touchActive) updateTouch(e); }, true);
 document.addEventListener('pointerup',   function(){ touchActive = false; releaseTouch(); }, true);
 document.addEventListener('pointercancel',function(){ touchActive = false; releaseTouch(); }, true);
 
-// Rotated -90deg: screen coords → game buttons
-// left of screen (px<80) = UP(4), right (px>160) = DOWN(5), top (py<80) = RIGHT(7), bottom (py>200) = LEFT(6)
 function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
@@ -168,12 +200,12 @@ function updateTouch(e) {
   if (px > 160) nd[5] = true;  // DOWN
   if (py < 80)  nd[7] = true;  // RIGHT
   if (py > 200) nd[6] = true;  // LEFT
-  for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k)); }
-  for (var k in touchDirs) { if (!nd[k])       release(parseInt(k)); }
+  for (var k in nd)       { if (!touchDirs[k]) { var m = touchMap[k]; press(parseInt(k), m.key, m.kc); } }
+  for (var k in touchDirs) { if (!nd[k])       { var m = touchMap[k]; release(parseInt(k), m.key, m.kc); } }
   touchDirs = nd;
 }
 function releaseTouch() {
-  for (var k in touchDirs) release(parseInt(k));
+  for (var k in touchDirs) { var m = touchMap[k]; release(parseInt(k), m.key, m.kc); }
   touchDirs = {};
 }
 
