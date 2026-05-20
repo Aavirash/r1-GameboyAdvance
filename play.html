@@ -13,13 +13,24 @@ html,body{
 }
 #game{
   position:absolute;
-  width:282px;height:240px;
-  left:-21px;top:21px;
+  width:282px!important;height:282px!important;
+  left:-21px;top:0;
   transform:rotate(-90deg);
   transform-origin:center center;
   background:#000;
+  overflow:hidden;
 }
-#game canvas{display:block;width:100%!important;height:100%!important;image-rendering:pixelated}
+#game canvas{display:block;width:100%!important;height:100%!important;image-rendering:pixelated;object-fit:fill}
+/* Hide EmulatorJS virtual gamepad */
+.ejs_virtualGamePad_parent,
+.ejs_virtualGamePad,
+[class*="virtualGamePad"],
+[class*="ejs_gamepad"]{display:none!important}
+/* Hide EmulatorJS bottom button bar */
+.ejs_menu_bar,
+.ejs_settings_menu,
+[class*="ejs_menu"],
+[class*="ejs-button"]{display:none!important}
 #status{
   position:absolute;bottom:0;left:0;right:0;height:14px;
   display:none;align-items:center;justify-content:center;
@@ -112,9 +123,9 @@ window.addEventListener('longPressEnd', function(){
   ku('Shift');
 });
 
-// Scroll = D-Pad right/left
-window.addEventListener('scrollUp',   function(){ tap('ArrowRight', 120); });
-window.addEventListener('scrollDown', function(){ tap('ArrowLeft', 120); });
+// Scroll = D-Pad (inverted for rotated R1: scrollUp=left, scrollDown=right)
+window.addEventListener('scrollUp',   function(){ tap('ArrowLeft', 120); });
+window.addEventListener('scrollDown', function(){ tap('ArrowRight', 120); });
 
 // Touch zones for D-Pad (same rotated mapping as before)
 document.addEventListener('pointerdown', function(e){
