@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=240,initial-scale=1.0,user-scalable=no">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>R1GBA</title>
@@ -25,7 +25,6 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 <div id="game"></div>
 
 <script>
-// ─── ROM URL from query string ───
 var romUrl = '';
 var m = location.search.match(/[?&]rom=([^&]+)/);
 if (m) {
@@ -35,7 +34,7 @@ if (m) {
   }
 }
 
-// ─── EmulatorJS Config (before loader.js) ───
+// ─── EmulatorJS Config ───
 EJS_player = '#game';
 EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
@@ -44,7 +43,7 @@ EJS_startOnLoaded = true;
 EJS_volume = 0.5;
 EJS_backgroundColor = '#000';
 
-// ─── Hide all toolbar buttons ───
+// Hide toolbar buttons
 EJS_Buttons = {
   playPause: false, restart: false, mute: false, settings: false,
   fullscreen: false, saveState: false, loadState: false, screenRecord: false,
@@ -53,30 +52,29 @@ EJS_Buttons = {
   cacheManager: false, exitEmulation: false
 };
 
-// ─── When emulator is ready, hide virtual gamepad ───
+// NO virtual gamepad buttons (hides the on-screen D-pad)
+EJS_VirtualGamepadSettings = [];
+
+// ─── After emulator loads ───
+var ejsCanvas = null;
 EJS_ready = function() {
-  // Aggressively hide the virtual gamepad overlay
-  var hideVGP = function() {
-    var vp = document.querySelector('.ejs_virtualGamePad_parent');
-    if (vp) vp.style.display = 'none';
-    var vg = document.querySelector('.ejs_virtualGamePad');
-    if (vg) vg.style.display = 'none';
-    // Also hide the bottom toolbar bar
-    var tb = document.querySelector('.ejs_menu_bar');
-    if (tb) tb.style.display = 'none';
-  };
-  hideVGP();
-  setInterval(hideVGP, 1000);
+  // Find the canvas for keyboard event dispatch
+  ejsCanvas = document.querySelector('#game canvas');
+  // Repeatedly hide virtual gamepad elements
+  setInterval(function() {
+    var els = document.querySelectorAll('.ejs_virtualGamePad_parent, .ejs_virtualGamePad, [class*="virtualGamePad"], [class*="ejs_gamepad"]');
+    for (var i = 0; i < els.length; i++) els[i].style.display = 'none';
+  }, 500);
 };
 
-// ─── Keyboard dispatch (window level, proper key codes) ───
-// EmulatorJS default GBA mapping: z=BUTTON_1(A), x=BUTTON_2(B),
-// shift=SELECT, enter=START, arrows=DPAD, q=L, e=R
+// ─── Keyboard dispatch to EmulatorJS canvas ───
 function kd(key, code) {
-  window.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
+  var t = ejsCanvas || document.body;
+  t.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), which:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
 }
 function ku(key, code) {
-  window.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
+  var t = ejsCanvas || document.body;
+  t.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), which:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
 }
 function tap(key, code, ms) {
   kd(key, code);
@@ -88,7 +86,7 @@ var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
 var touchDirs = {}, touchActive = false;
 var SUPER_LONG_MS = 2000, superLongTimer = null;
 
-// PTT: 1 click = A(z), 2 clicks = B(x), 3+ = Start(enter)
+// PTT: 1=A(z), 2=B(x), 3+=Start(enter)
 window.addEventListener('sideClick', function(){
   if (longHeld) return;
   var now = Date.now();
@@ -120,13 +118,14 @@ window.addEventListener('longPressEnd', function(){
   ku('Shift', 'ShiftLeft');
 });
 
-// Scroll wheel: scrollUp = D-Right, scrollDown = D-Left
-// (matches original IodineGBA mapping: wheel up=right, wheel down=left)
-window.addEventListener('scrollUp',   function(){ tap('ArrowRight', 'ArrowRight', 120); });
-window.addEventListener('scrollDown', function(){ tap('ArrowLeft', 'ArrowLeft', 120); });
+// ─── Scroll ───
+// R1 CLAUDE.md: scrollDown = forward/increase, scrollUp = backward/decrease
+// With screen rotated -90°: forward in game = ArrowRight, backward = ArrowLeft
+window.addEventListener('scrollDown', function(){ tap('ArrowRight', 'ArrowRight', 120); });
+window.addEventListener('scrollUp',   function(){ tap('ArrowLeft', 'ArrowLeft', 120); });
 
-// Touch zones for full D-pad
-// Rotated R1: left=up(forward), right=down(back), top=right, bottom=left
+// ─── Touch D-Pad ───
+// Rotated -90°: left=Up(forward), right=Down(back), top=Right, bottom=Left
 document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
 document.addEventListener('pointermove', function(e){ if(touchActive) updateTouch(e); }, true);
 document.addEventListener('pointerup',   function(){ touchActive = false; releaseTouch(); }, true);
@@ -149,17 +148,9 @@ function releaseTouch() {
   touchDirs = {};
 }
 
-// ─── Resume audio context on any gesture ───
+// Audio resume on gesture
 function tryResume() {
-  try {
-    if (window.AudioContext) {
-      var ctxs = [];
-      // Try to find existing suspended AudioContexts
-      document.querySelectorAll('canvas, iframe, embed, object').forEach(function(el){
-        try { if (el.AudioContext) ctxs.push(el.AudioContext); } catch(e){}
-      });
-    }
-  } catch(e) {}
+  try { if (window.AudioContext && window.AudioContext.prototype.resume) window.AudioContext.prototype.resume(); } catch(e) {}
 }
 window.addEventListener('sideClick', tryResume);
 window.addEventListener('scrollUp', tryResume);
