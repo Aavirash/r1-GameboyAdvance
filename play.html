@@ -19,6 +19,26 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   background:#000;
   overflow:hidden;
 }
+/* Hide virtual gamepad and all EmulatorJS overlay UI */
+#game .ejs_virtual_gamepad,
+#game .ejs_virtualGamepad,
+#game [class*="virtualGamepad"],
+#game [class*="virtual_gamepad"],
+#game [class*="VirtualGamepad"],
+#game .ejs_gamepad,
+#game .ejs_gamepad_parent,
+#game .ejs_dpad,
+#game .ejs_button,
+#game .ejs_start_button,
+.ejs_virtual_gamepad,
+.ejs_virtualGamepad,
+[class*="virtualGamepad"],
+[class*="virtual_gamepad"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 </style>
 </head>
 <body>
@@ -56,25 +76,32 @@ EJS_Buttons = {
 EJS_VirtualGamepadSettings = [];
 
 // ─── After emulator loads ───
-var ejsCanvas = null;
+var ejsParent = null;
 EJS_ready = function() {
-  // Find the canvas for keyboard event dispatch
-  ejsCanvas = document.querySelector('#game canvas');
-  // Repeatedly hide virtual gamepad elements
+  ejsParent = document.querySelector('#game');
+  // Nuclear option: hide virtual gamepad via DOM traversal
   setInterval(function() {
-    var els = document.querySelectorAll('.ejs_virtualGamePad_parent, .ejs_virtualGamePad, [class*="virtualGamePad"], [class*="ejs_gamepad"]');
-    for (var i = 0; i < els.length; i++) els[i].style.display = 'none';
-  }, 500);
+    var all = document.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var c = all[i].className;
+      if (typeof c === 'string' && (c.indexOf('virtual') >= 0 || c.indexOf('gamepad') >= 0 || c.indexOf('Gamepad') >= 0 || c.indexOf('dpad') >= 0 || c.indexOf('Dpad') >= 0)) {
+        all[i].style.display = 'none';
+        all[i].style.visibility = 'hidden';
+        all[i].style.pointerEvents = 'none';
+      }
+    }
+  }, 200);
 };
 
-// ─── Keyboard dispatch to EmulatorJS canvas ───
+// ─── Keyboard dispatch to EmulatorJS parent element ───
+// EmulatorJS listens on this.elements.parent (the #game div)
 function kd(key, code) {
-  var t = ejsCanvas || document.body;
-  t.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), which:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
+  var t = ejsParent || document.querySelector('#game') || document.body;
+  t.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:code, keyCode:key==='Enter'?13:key==='Shift'?16:0, bubbles:true, cancelable:true}));
 }
 function ku(key, code) {
-  var t = ejsCanvas || document.body;
-  t.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:code, keyCode:code==='Enter'?13:key.charCodeAt(0), which:code==='Enter'?13:key.charCodeAt(0), bubbles:true}));
+  var t = ejsParent || document.querySelector('#game') || document.body;
+  t.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:code, keyCode:key==='Enter'?13:key==='Shift'?16:0, bubbles:true, cancelable:true}));
 }
 function tap(key, code, ms) {
   kd(key, code);
