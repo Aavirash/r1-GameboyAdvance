@@ -44,7 +44,9 @@ html,body{
 <script>
 // ─── Parse ROM URL from query string ───
 var romUrl = '';
-var m = location.search.match(/[?&]rom=([^&]+)/);
+var qs = location.search;
+// Strip ?v= param cache-buster for parsing
+var m = qs.replace(/[?&]v=[^&]*/g,'').match(/[?&]rom=([^&]+)/);
 if (m) {
   romUrl = decodeURIComponent(m[1]);
   // If it looks like a raw file ID (not a URL), assume Google Drive
@@ -109,7 +111,7 @@ window.addEventListener('longPressStart', function(){
   superLongTimer = setTimeout(function(){
     if (longHeld) {
       ku('Shift', 'ShiftLeft');
-      window.location.href = 'index.html';
+      window.location.href = 'index.html?v=4';
     }
   }, SUPER_LONG_MS);
 });
