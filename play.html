@@ -19,26 +19,19 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   background:#000;
   overflow:hidden;
 }
-#game canvas{width:100%!important;height:100%!important}
-#game .ejs_canvas{width:100%!important;height:100%!important}
-.ejs_parent{display:flex!important}
+#game canvas,.ejs_canvas{width:100%!important;height:100%!important}
 .ejs_parent canvas{width:100%!important;height:100%!important}
-/* Hide virtual gamepad */
-#game [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-#game [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-#game [class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-#game [class*="dpad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-#game [class*="Dpad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-#game [class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="virtualGamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="virtual_gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="ejs_virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-/* Hide bottom bar */
-#game .ejs_bottom_bar{display:none!important}
+/* Hide virtual gamepad and bottom bar */
+[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="ejs_bottom"]{display:none!important}
 </style>
 </head>
 <body>
 <div id="game"></div>
+<div id="dbg" style="position:absolute;bottom:4px;left:4px;color:lime;font:10px monospace;z-index:9999;pointer-events:none"></div>
 
 <script>
 var romUrl = '';
@@ -57,135 +50,112 @@ EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
 EJS_volume = 0.5;
 EJS_backgroundColor = '#000';
-
 EJS_Buttons = {
-  playPause: false, restart: false, mute: false, settings: false,
-  fullscreen: false, saveState: false, loadState: false, screenRecord: false,
-  gamepad: false, cheat: false, volume: false, saveSavFiles: false,
-  loadSavFiles: false, quickSave: false, quickLoad: false, screenshot: false,
-  cacheManager: false, exitEmulation: false
+  playPause:false, restart:false, mute:false, settings:false,
+  fullscreen:false, saveState:false, loadState:false, screenRecord:false,
+  gamepad:false, cheat:false, volume:false, saveSavFiles:false,
+  loadSavFiles:false, quickSave:false, quickLoad:false, screenshot:false,
+  cacheManager:false, exitEmulation:false
 };
-
 EJS_VirtualGamepadSettings = [];
 
-// ─── Input system ───
-// Button indices: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
-// keyMap: z=90, x=88, enter=13, shift=16, arrows=37-40
 var gm = null;
-var inputReady = false;
-
-// Method 1: simulateInput (direct WASM call)
-function simPress(btn) {
-  if (gm) { try { gm.simulateInput(0, btn, 1); return true; } catch(e) {} }
-  return false;
-}
-function simRelease(btn) {
-  if (gm) { try { gm.simulateInput(0, btn, 0); return true; } catch(e) {} }
-  return false;
+var started = false;
+var dbgEl = document.getElementById('dbg');
+var dbgLines = [];
+function dbg(s) {
+  dbgLines.push(s);
+  if (dbgLines.length > 6) dbgLines.shift();
+  dbgEl.textContent = dbgLines.join('\n');
 }
 
-// Method 2: Keyboard dispatch with correct keyCodes (fallback)
-// EmulatorJS keyChange compares this.controls[i][j].value === e.keyCode
-// After setupKeys(), values are numeric keyCodes
-function keyPress(key, keyCode) {
-  var t = document.querySelector('#game');
-  if (!t) return;
-  t.dispatchEvent(new KeyboardEvent('keydown', {key:key, code:key==='z'?'KeyZ':key==='x'?'KeyX':key==='Enter'?'Enter':key==='Shift'?'ShiftLeft':key, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
-}
-function keyRelease(key, keyCode) {
-  var t = document.querySelector('#game');
-  if (!t) return;
-  t.dispatchEvent(new KeyboardEvent('keyup', {key:key, code:key==='z'?'KeyZ':key==='x'?'KeyX':key==='Enter'?'Enter':key==='Shift'?'ShiftLeft':key, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
-}
-
-// Combined press/release - try simulateInput first, fall back to keyboard
-function press(btn, key, keyCode) {
-  if (!simPress(btn)) keyPress(key, keyCode);
-}
-function release(btn, key, keyCode) {
-  if (!simRelease(btn)) keyRelease(key, keyCode);
-}
-function tap(btn, key, keyCode, ms) {
-  press(btn, key, keyCode);
-  setTimeout(function(){ release(btn, key, keyCode); }, ms || 80);
-}
-
-// Wait for gameManager to be available
-function waitForGM(cb) {
-  if (gm) { cb(); return; }
-  var tries = 0;
-  var check = setInterval(function() {
-    tries++;
-    try {
-      gm = window.EJS_emulator && window.EJS_emulator.gameManager;
-    } catch(e) {}
-    if (gm) { clearInterval(check); cb(); }
-    if (tries > 60) { clearInterval(check); } // 30 seconds
-  }, 500);
-}
-
+// EJS_onGameStart fires when game is actually running
 EJS_onGameStart = function() {
-  waitForGM(function() {
-    inputReady = true;
-  });
-  // Aggressively hide virtual gamepad
-  setInterval(function() {
-    var all = document.querySelectorAll('#game *');
-    for (var i = 0; i < all.length; i++) {
-      var c = all[i].className || '';
-      var t = all[i].tagName || '';
-      if (typeof c === 'string' && (c.indexOf('virtual') >= 0 || c.indexOf('gamepad') >= 0 || c.indexOf('Gamepad') >= 0 || c.indexOf('nipple') >= 0 || c.indexOf('dpad') >= 0 || c.indexOf('Dpad') >= 0)) {
-        all[i].style.display = 'none';
-        all[i].style.visibility = 'hidden';
-        all[i].style.pointerEvents = 'none';
+  dbg('EJS_onGameStart fired');
+  var tryGet = setInterval(function() {
+    try {
+      if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+        gm = window.EJS_emulator.gameManager;
+        started = true;
+        dbg('gm OK simInput=' + (typeof gm.simulateInput));
+        clearInterval(tryGet);
       }
+    } catch(e) {
+      dbg('gm err: ' + e.message);
     }
+  }, 300);
+  // Hide virtual gamepad aggressively
+  setInterval(function() {
+    document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
+      el.style.display = 'none';
+      el.style.visibility = 'hidden';
+    });
   }, 200);
 };
+
+// Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
+// keyMap keyCodes: z=90, x=88, Enter=13, Shift=16, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
+
+function doInput(btn, keyCode, val) {
+  if (gm) {
+    try { gm.simulateInput(0, btn, val); return; } catch(e) { dbg('sim err:'+e.message); }
+  }
+  // Fallback: dispatch keyboard event with correct keyCode to #game
+  var el = document.querySelector('#game');
+  if (!el) { dbg('no #game'); return; }
+  var keyName = {90:'z',88:'x',13:'Enter',16:'Shift',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[keyCode] || 'unknown';
+  var evtType = val === 1 ? 'keydown' : 'keyup';
+  el.dispatchEvent(new KeyboardEvent(evtType, {key:keyName, code:keyCode===16?'ShiftLeft':keyName, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
+}
+
+function press(btn, kc) { doInput(btn, kc, 1); }
+function release(btn, kc) { doInput(btn, kc, 0); }
+function tap(btn, kc, ms) {
+  press(btn, kc);
+  setTimeout(function(){ release(btn, kc); }, ms || 80);
+}
 
 // ─── R1 Controls ───
 var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
 var SUPER_LONG_MS = 2000, superLongTimer = null;
 
-// PTT: 1=A(8,z,90), 2=B(0,x,88)
+// PTT: 1=A(btn8,kc90), 2=B(btn0,kc88)
 window.addEventListener('sideClick', function(){
   if (longHeld) return;
   var now = Date.now();
   clearTimeout(sideTimer);
   sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
   lastSide = now;
+  dbg('side cnt=' + sideCount);
   sideTimer = setTimeout(function(){
-    if (sideCount === 1) tap(8, 'z', 90, 80);       // A
-    else if (sideCount === 2) tap(0, 'x', 88, 80);   // B
+    if (sideCount === 1) { dbg('A'); tap(8, 90, 80); }
+    else if (sideCount === 2) { dbg('B'); tap(0, 88, 80); }
     sideCount = 0;
   }, 350);
 });
 
-// Long press = Start(3,enter,13). Super long (2s) = back to menu
+// Long press = Start(3,kc13). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
-  press(3, 'Enter', 13);
+  dbg('START dn');
+  press(3, 13);
   superLongTimer = setTimeout(function(){
-    if (longHeld) {
-      release(3, 'Enter', 13);
-      window.location.href = 'index.html';
-    }
+    if (longHeld) { release(3, 13); window.location.href = 'index.html'; }
   }, SUPER_LONG_MS);
 });
 window.addEventListener('longPressEnd', function(){
   longHeld = false;
   clearTimeout(superLongTimer);
-  release(3, 'Enter', 13);
+  dbg('START up');
+  release(3, 13);
 });
 
-// ─── Scroll = D-pad ───
-window.addEventListener('scrollDown', function(){ tap(7, 'ArrowRight', 39, 120); }); // RIGHT
-window.addEventListener('scrollUp',   function(){ tap(6, 'ArrowLeft', 37, 120); });   // LEFT
+// Scroll: R1 scrollUp = previous, scrollDown = next
+window.addEventListener('scrollDown', function(){ dbg('R dn'); tap(7, 39, 120); });
+window.addEventListener('scrollUp',   function(){ dbg('L up'); tap(6, 37, 120); });
 
-// ─── Touch D-Pad ───
-// Button mapping: 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT
-// KeyCodes: UP=38, DOWN=40, LEFT=37, RIGHT=39
-var touchMap = {4:{key:'ArrowUp',kc:38}, 5:{key:'ArrowDown',kc:40}, 6:{key:'ArrowLeft',kc:37}, 7:{key:'ArrowRight',kc:39}};
+// Touch D-Pad
+var touchMap = {4:38, 5:40, 6:37, 7:39};
 var touchDirs = {}, touchActive = false;
 document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
 document.addEventListener('pointermove', function(e){ if(touchActive) updateTouch(e); }, true);
@@ -196,20 +166,20 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  if (px < 80)  nd[4] = true;  // UP
-  if (px > 160) nd[5] = true;  // DOWN
-  if (py < 80)  nd[7] = true;  // RIGHT
-  if (py > 200) nd[6] = true;  // LEFT
-  for (var k in nd)       { if (!touchDirs[k]) { var m = touchMap[k]; press(parseInt(k), m.key, m.kc); } }
-  for (var k in touchDirs) { if (!nd[k])       { var m = touchMap[k]; release(parseInt(k), m.key, m.kc); } }
+  if (px < 80)  nd[4] = true;
+  if (px > 160) nd[5] = true;
+  if (py < 80)  nd[7] = true;
+  if (py > 200) nd[6] = true;
+  for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
+  for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
 }
 function releaseTouch() {
-  for (var k in touchDirs) { var m = touchMap[k]; release(parseInt(k), m.key, m.kc); }
+  for (var k in touchDirs) release(parseInt(k), touchMap[k]);
   touchDirs = {};
 }
 
-// Audio resume on gesture
+// Audio resume
 function tryResume() {
   try { if (window.AudioContext && window.AudioContext.prototype.resume) window.AudioContext.prototype.resume(); } catch(e) {}
 }
