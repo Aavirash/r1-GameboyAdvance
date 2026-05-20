@@ -20,7 +20,7 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   overflow:hidden;
 }
 #game canvas{width:100%!important;height:100%!important}
-/* Hide virtual gamepad and all EmulatorJS overlay UI */
+/* Hide virtual gamepad */
 #game .ejs_virtual_gamepad,
 #game .ejs_virtualGamepad,
 #game [class*="virtualGamepad"],
@@ -74,13 +74,23 @@ EJS_Buttons = {
 EJS_VirtualGamepadSettings = [];
 
 // ─── Direct input via simulateInput ───
-// EmulatorJS button indices (from initControlVars):
-// 0=B, 1=Y, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A, 9=X, 10=L, 11=R
+// Button indices: 0=B, 1=Y, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A, 9=X, 10=L, 11=R
 var gm = null;
-EJS_ready = function() {
-  // Get reference to gameManager for direct input injection
-  try { gm = window.EJS_emulator.gameManager; } catch(e) {}
-  // Hide virtual gamepad elements aggressively
+
+// EJS_onGameStart fires AFTER the game is running and gameManager exists
+EJS_onGameStart = function() {
+  try {
+    gm = window.EJS_emulator.gameManager;
+  } catch(e) {
+    // Fallback: keep trying
+    var tryGm = setInterval(function() {
+      try {
+        gm = window.EJS_emulator.gameManager;
+        if (gm) clearInterval(tryGm);
+      } catch(e2) {}
+    }, 500);
+  }
+  // Hide virtual gamepad elements
   setInterval(function() {
     var all = document.querySelectorAll('*');
     for (var i = 0; i < all.length; i++) {
@@ -94,25 +104,19 @@ EJS_ready = function() {
   }, 200);
 };
 
-// Direct input: simulateInput(player, button, value)
-// value: 1 = press, 0 = release
-function press(btn) {
-  if (gm) { gm.simulateInput(0, btn, 1); }
-}
-function release(btn) {
-  if (gm) { gm.simulateInput(0, btn, 0); }
-}
+// Direct simulateInput: player=0, btn=index, value=1 press / 0 release
+function press(btn) { if (gm) gm.simulateInput(0, btn, 1); }
+function release(btn) { if (gm) gm.simulateInput(0, btn, 0); }
 function tap(btn, ms) {
   press(btn);
   setTimeout(function(){ release(btn); }, ms || 80);
 }
 
 // ─── R1 Controls ───
-// Button indices: 8=A, 0=B, 3=START, 2=SELECT, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT
 var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
 var SUPER_LONG_MS = 2000, superLongTimer = null;
 
-// PTT: 1=A(8), 2=B(0), 3+=Start(3)
+// PTT: 1=A(8), 2=B(0)
 window.addEventListener('sideClick', function(){
   if (longHeld) return;
   var now = Date.now();
@@ -120,9 +124,8 @@ window.addEventListener('sideClick', function(){
   sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
   lastSide = now;
   sideTimer = setTimeout(function(){
-    if (sideCount === 1)      tap(8, 60);
-    else if (sideCount === 2) tap(0, 60);
-    else                      tap(3, 60);
+    if (sideCount === 1) tap(8, 80);      // A
+    else if (sideCount === 2) tap(0, 80);  // B
     sideCount = 0;
   }, 350);
 });
@@ -130,7 +133,7 @@ window.addEventListener('sideClick', function(){
 // Long press = Start(3). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
-  press(3);
+  press(3); // START
   superLongTimer = setTimeout(function(){
     if (longHeld) {
       release(3);
@@ -141,12 +144,12 @@ window.addEventListener('longPressStart', function(){
 window.addEventListener('longPressEnd', function(){
   longHeld = false;
   clearTimeout(superLongTimer);
-  release(3);
+  release(3); // START release
 });
 
 // ─── Scroll = D-pad ───
-window.addEventListener('scrollDown', function(){ tap(7, 120); });
-window.addEventListener('scrollUp',   function(){ tap(6, 120); });
+window.addEventListener('scrollDown', function(){ tap(7, 120); }); // RIGHT
+window.addEventListener('scrollUp',   function(){ tap(6, 120); }); // LEFT
 
 // ─── Touch D-Pad ───
 var touchDirs = {}, touchActive = false;
@@ -156,21 +159,21 @@ document.addEventListener('pointerup',   function(){ touchActive = false; releas
 document.addEventListener('pointercancel',function(){ touchActive = false; releaseTouch(); }, true);
 
 // Rotated -90deg: screen coords → game buttons
-// left of screen (px<80) = UP, right (px>160) = DOWN, top (py<80) = RIGHT, bottom (py>200) = LEFT
+// left of screen (px<80) = UP(4), right (px>160) = DOWN(5), top (py<80) = RIGHT(7), bottom (py>200) = LEFT(6)
 function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  if (px < 80)  nd[4] = true;
-  if (px > 160) nd[5] = true;
-  if (py < 80)  nd[7] = true;
-  if (py > 200) nd[6] = true;
-  for (var k in nd)       { if (!touchDirs[k]) press(k); }
-  for (var k in touchDirs) { if (!nd[k])       release(k); }
+  if (px < 80)  nd[4] = true;  // UP
+  if (px > 160) nd[5] = true;  // DOWN
+  if (py < 80)  nd[7] = true;  // RIGHT
+  if (py > 200) nd[6] = true;  // LEFT
+  for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k)); }
+  for (var k in touchDirs) { if (!nd[k])       release(parseInt(k)); }
   touchDirs = nd;
 }
 function releaseTouch() {
-  for (var k in touchDirs) release(k);
+  for (var k in touchDirs) release(parseInt(k));
   touchDirs = {};
 }
 
