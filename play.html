@@ -119,10 +119,9 @@ window.addEventListener('longPressEnd', function(){
 });
 
 // ─── Scroll ───
-// R1 CLAUDE.md: scrollDown = forward/increase, scrollUp = backward/decrease
-// With screen rotated -90°: forward in game = ArrowRight, backward = ArrowLeft
-window.addEventListener('scrollDown', function(){ tap('ArrowRight', 'ArrowRight', 120); });
-window.addEventListener('scrollUp',   function(){ tap('ArrowLeft', 'ArrowLeft', 120); });
+// R1 fires scrollUp when scrolling down, so we swap
+window.addEventListener('scrollDown', function(){ tap('ArrowLeft', 'ArrowLeft', 120); });
+window.addEventListener('scrollUp',   function(){ tap('ArrowRight', 'ArrowRight', 120); });
 
 // ─── Touch D-Pad ───
 // Rotated -90°: left=Up(forward), right=Down(back), top=Right, bottom=Left

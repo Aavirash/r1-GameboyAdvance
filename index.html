@@ -144,8 +144,8 @@ function menuDown() { if (menuIndex < GAMES.length-1) { menuIndex++; renderMenu(
 
 function setupR1Controls() {
   window.addEventListener('sideClick', function(){ selectGame(menuIndex); });
-  window.addEventListener('scrollUp',   menuUp);
-  window.addEventListener('scrollDown', menuDown);
+window.addEventListener('scrollUp',   menuDown);
+window.addEventListener('scrollDown', menuUp);
   window.addEventListener('longPressStart', function(){ selectGame(menuIndex); });
 }
 
