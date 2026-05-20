@@ -24,16 +24,9 @@ html,body{
   overflow:hidden;
 }
 #game canvas{display:block;width:100%!important;height:100%!important;image-rendering:pixelated;object-fit:fill}
-/* Hide EmulatorJS virtual gamepad */
+/* Hide EmulatorJS virtual gamepad only */
 .ejs_virtualGamePad_parent,
-.ejs_virtualGamePad,
-[class*="virtualGamePad"],
-[class*="ejs_gamepad"]{display:none!important}
-/* Hide EmulatorJS bottom button bar */
-.ejs_menu_bar,
-.ejs_settings_menu,
-[class*="ejs_menu"],
-[class*="ejs-button"]{display:none!important}
+.ejs_virtualGamePad{display:none!important}
 #status{
   position:absolute;bottom:0;left:0;right:0;height:14px;
   display:none;align-items:center;justify-content:center;
@@ -66,7 +59,6 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_forceLegacyCores = true; // avoid SharedArrayBuffer requirement
 EJS_volume = 0.5;
 
 // Hide all UI buttons for clean R1 screen
