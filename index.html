@@ -126,9 +126,10 @@ function renderMenu() {
   for (var i=0;i<items.length;i++){
     items[i].classList.toggle('selected', i===menuIndex);
   }
-  var itemH = 28, viewH = 230;
-  var maxScroll = Math.max(0, (items.length * itemH) - viewH);
-  var target = Math.min(maxScroll, Math.max(0, menuIndex * itemH - viewH/2 + itemH/2));
+  var itemH = 28;
+  var viewH = document.getElementById('menu-list-wrap').clientHeight;
+  var maxScroll = Math.max(0, items.length * itemH - viewH);
+  var target = Math.max(0, Math.min(maxScroll, menuIndex * itemH));
   $menuList.style.transform = 'translateY(-'+target+'px)';
 }
 
