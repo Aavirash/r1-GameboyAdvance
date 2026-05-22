@@ -9,7 +9,14 @@
 <title>R1GBA</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-select:none;user-select:none}
+html,body{
+  width:240px;height:282px;
+  overflow:hidden;
+  background:#000;
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  touch-action:none;
+}
 #game{
   position:absolute;
   width:282px!important;height:240px!important;
@@ -19,17 +26,42 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   background:#000;
   overflow:hidden;
 }
-#game canvas,.ejs_canvas,.ejs_parent canvas{
-  width:282px!important;
-  height:240px!important;
-  object-fit:fill!important;
+#game > *{
+  position:absolute!important;
+  top:0!important;left:0!important;
+  width:100%!important;height:100%!important;
+  border:none!important;
+  margin:0!important;
+  padding:0!important;
 }
-/* Hide virtual gamepad and bottom bar */
-[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="ejs_bottom"]{display:none!important}
+#game canvas,.ejs_canvas,.ejs_parent canvas{
+  position:absolute!important;
+  top:0!important;left:0!important;
+  width:100%!important;height:100%!important;
+  min-width:100%!important;min-height:100%!important;
+  object-fit:cover!important;
+  border:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+/* Nuke ALL EmulatorJS chrome — only canvas survives */
+[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],
+[class*="nipple"],[class*="ejs_"],[class*="EJS_"],
+[class*="emscripten"],[id*="ejs"],[id*="EJS"],
+.ejs_parent,.ejs_container,.ejs_shell,.ejs_overlay,
+.ejs_bottom,.ejs_menu,.ejs_settings,.ejs_controls{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  /* Prevent layout from these elements */
+  position:fixed!important;
+  top:-9999px!important;
+  left:-9999px!important;
+  width:0!important;
+  height:0!important;
+  overflow:hidden!important;
+}
 </style>
 </head>
 <body>
@@ -50,7 +82,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_volume = 0.12;
+EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
   playPause:false, restart:false, mute:false, settings:false,
@@ -74,20 +106,40 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
+  // Aggressively strip ALL EmulatorJS chrome — only keep canvas
   setInterval(function() {
-    document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
-      el.style.display = 'none';
-      el.style.visibility = 'hidden';
-    });
-  }, 200);
+    var game = document.getElementById('game');
+    if (!game) return;
+    // Walk all descendants and hide non-canvas elements
+    var all = game.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].tagName !== 'CANVAS') {
+        all[i].style.setProperty('display', 'none', 'important');
+        all[i].style.setProperty('pointer-events', 'none', 'important');
+      }
+    }
+    // Ensure canvas fills and is visible
+    var cvs = game.querySelectorAll('canvas');
+    for (var j = 0; j < cvs.length; j++) {
+      cvs[j].style.setProperty('display', 'block', 'important');
+      cvs[j].style.setProperty('position', 'absolute', 'important');
+      cvs[j].style.setProperty('top', '0', 'important');
+      cvs[j].style.setProperty('left', '0', 'important');
+      cvs[j].style.setProperty('width', '100%', 'important');
+      cvs[j].style.setProperty('height', '100%', 'important');
+      cvs[j].style.setProperty('object-fit', 'cover', 'important');
+      cvs[j].style.setProperty('pointer-events', 'auto', 'important');
+    }
+  }, 100);
 };
 
 // Button indices: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
-// Visual landscape mapping (screen rotated -90deg):
-//   physical left  → game LEFT  (btn 6)
-//   physical right → game RIGHT (btn 7)
-//   physical top   → game UP    (btn 4)
-//   physical bottom→ game DOWN  (btn 5)
+// Device rotated right (clockwise 90°). CSS rotate(-90deg) compensates.
+// Physical → Visual → Game mapping:
+//   physical left  (small px) → visual top    → game UP    (btn 4, kc 38)
+//   physical right (large px) → visual bottom → game DOWN  (btn 5, kc 40)
+//   physical top   (small py) → visual left   → game LEFT  (btn 6, kc 37)
+//   physical bottom(large py) → visual right  → game RIGHT (btn 7, kc 39)
 // keyMap keyCodes: z=90, x=88, Enter=13, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
 
 function doInput(btn, keyCode, val) {
@@ -155,11 +207,12 @@ window.addEventListener('scrollUp', function(){
 });
 
 // ─── Touch D-Pad (landscape orientation) ───
-// Screen rotated -90deg: map touch zones to VISUAL directions
-//   px < 80  (physical left)   → game LEFT  (btn 6, kc 37)
-//   px > 160 (physical right)  → game RIGHT (btn 7, kc 39)
-//   py < 80  (physical top)    → game UP    (btn 4, kc 38)
-//   py > 200 (physical bottom) → game DOWN  (btn 5, kc 40)
+// Device rotated right (clockwise 90°). CSS rotate(-90deg) compensates.
+// Physical → Visual mapping:
+//   px < 80  (physical left)   → visual top    → game UP    (btn 4, kc 38)
+//   px > 160 (physical right)  → visual bottom → game DOWN  (btn 5, kc 40)
+//   py < 80  (physical top)    → visual left   → game LEFT  (btn 6, kc 37)
+//   py > 200 (physical bottom) → visual right  → game RIGHT (btn 7, kc 39)
 var touchMap = {4:38, 5:40, 6:37, 7:39};
 var touchDirs = {}, touchActive = false;
 document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
@@ -171,10 +224,10 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  if (px < 80)  nd[6] = true;  // LEFT
-  if (px > 160) nd[7] = true;  // RIGHT
-  if (py < 80)  nd[4] = true;  // UP
-  if (py > 200) nd[5] = true;  // DOWN
+  if (px < 80)  nd[4] = true;  // UP
+  if (px > 160) nd[5] = true;  // DOWN
+  if (py < 80)  nd[6] = true;  // LEFT
+  if (py > 200) nd[7] = true;  // RIGHT
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
@@ -183,6 +236,12 @@ function releaseTouch() {
   for (var k in touchDirs) release(parseInt(k), touchMap[k]);
   touchDirs = {};
 }
+
+// Prevent default browser gestures & navigation
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, true);
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, true);
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, true);
+document.addEventListener('gestureend', function(e){ e.preventDefault(); }, true);
 
 // Audio resume
 function tryResume() {
