@@ -187,10 +187,10 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  // Visual left side (physical top = small py) after -90° rotate
-  // UP above DOWN, close together on the left edge
-  if (py < 80 && px < 120) nd[4] = true;   // UP
-  if (py < 80 && px >= 120) nd[5] = true;  // DOWN
+  // LEFT side of landscape = physical bottom (py > 200) after rotate
+  // UP and DOWN close together side by side
+  if (py > 200 && px < 140) nd[4] = true;   // UP — moved closer to DOWN
+  if (py > 200 && px > 150) nd[5] = true;   // DOWN — untouched
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
