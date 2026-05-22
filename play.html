@@ -14,7 +14,6 @@ html,body{
   overflow:hidden;
   background:#000;
   -webkit-user-select:none;user-select:none;
-  -webkit-touch-callout:none;
   touch-action:none;
 }
 #game{
@@ -26,42 +25,19 @@ html,body{
   background:#000;
   overflow:hidden;
 }
-#game > *{
-  position:absolute!important;
-  top:0!important;left:0!important;
-  width:100%!important;height:100%!important;
-  border:none!important;
-  margin:0!important;
-  padding:0!important;
-}
 #game canvas,.ejs_canvas,.ejs_parent canvas{
-  position:absolute!important;
-  top:0!important;left:0!important;
-  width:100%!important;height:100%!important;
-  min-width:100%!important;min-height:100%!important;
-  object-fit:cover!important;
-  border:none!important;
-  margin:0!important;
-  padding:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:100%!important;
+  min-height:100%!important;
+  object-fit:fill!important;
 }
-/* Nuke ALL EmulatorJS chrome — only canvas survives */
-[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],
-[class*="nipple"],[class*="ejs_"],[class*="EJS_"],
-[class*="emscripten"],[id*="ejs"],[id*="EJS"],
-.ejs_parent,.ejs_container,.ejs_shell,.ejs_overlay,
-.ejs_bottom,.ejs_menu,.ejs_settings,.ejs_controls{
-  display:none!important;
-  visibility:hidden!important;
-  opacity:0!important;
-  pointer-events:none!important;
-  /* Prevent layout from these elements */
-  position:fixed!important;
-  top:-9999px!important;
-  left:-9999px!important;
-  width:0!important;
-  height:0!important;
-  overflow:hidden!important;
-}
+/* Hide virtual gamepad and bottom bar */
+[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="ejs_bottom"]{display:none!important}
 </style>
 </head>
 <body>
@@ -106,31 +82,12 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
-  // Aggressively strip ALL EmulatorJS chrome — only keep canvas
   setInterval(function() {
-    var game = document.getElementById('game');
-    if (!game) return;
-    // Walk all descendants and hide non-canvas elements
-    var all = game.querySelectorAll('*');
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].tagName !== 'CANVAS') {
-        all[i].style.setProperty('display', 'none', 'important');
-        all[i].style.setProperty('pointer-events', 'none', 'important');
-      }
-    }
-    // Ensure canvas fills and is visible
-    var cvs = game.querySelectorAll('canvas');
-    for (var j = 0; j < cvs.length; j++) {
-      cvs[j].style.setProperty('display', 'block', 'important');
-      cvs[j].style.setProperty('position', 'absolute', 'important');
-      cvs[j].style.setProperty('top', '0', 'important');
-      cvs[j].style.setProperty('left', '0', 'important');
-      cvs[j].style.setProperty('width', '100%', 'important');
-      cvs[j].style.setProperty('height', '100%', 'important');
-      cvs[j].style.setProperty('object-fit', 'cover', 'important');
-      cvs[j].style.setProperty('pointer-events', 'auto', 'important');
-    }
-  }, 100);
+    document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
+      el.style.display = 'none';
+      el.style.visibility = 'hidden';
+    });
+  }, 200);
 };
 
 // Button indices: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
