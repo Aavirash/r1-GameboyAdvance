@@ -13,7 +13,7 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 #game{
   position:absolute;
   width:282px!important;height:240px!important;
-  left:-21px;top:0;
+  left:-21px;top:21px;
   transform:rotate(-90deg);
   transform-origin:center center;
   background:#000;
@@ -50,7 +50,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_volume = 0.5;
+EJS_volume = 0.12;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
   playPause:false, restart:false, mute:false, settings:false,
@@ -141,9 +141,18 @@ window.addEventListener('longPressEnd', function(){
   release(3, 13);
 });
 
-// Scroll: landscape orientation — scrollDown goes RIGHT, scrollUp goes LEFT
-window.addEventListener('scrollDown', function(){ tap(7, 39, 120); });
-window.addEventListener('scrollUp',   function(){ tap(6, 37, 120); });
+// Scroll: hold direction while scrolling — release 200ms after last scroll
+var scrollTimer = null, scrollDir = null;
+window.addEventListener('scrollDown', function(){
+  clearTimeout(scrollTimer);
+  if (scrollDir !== 7) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=7; press(7, 39); }
+  scrollTimer = setTimeout(function(){ if (scrollDir===7) { release(7,39); scrollDir=null; } }, 200);
+});
+window.addEventListener('scrollUp', function(){
+  clearTimeout(scrollTimer);
+  if (scrollDir !== 6) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=6; press(6, 37); }
+  scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
+});
 
 // ─── Touch D-Pad (landscape orientation) ───
 // Screen rotated -90deg: map touch zones to VISUAL directions
