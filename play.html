@@ -21,6 +21,8 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 }
 #game canvas,.ejs_canvas{width:100%!important;height:100%!important}
 .ejs_parent canvas{width:100%!important;height:100%!important}
+#menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
+#game{touch-action:none}
 /* Hide virtual gamepad and bottom bar */
 [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
@@ -31,6 +33,7 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 </head>
 <body>
 <div id="game"></div>
+<div id="menu-trigger"></div>
 
 <script>
 var romUrl = '';
@@ -57,6 +60,10 @@ EJS_Buttons = {
   cacheManager:false, exitEmulation:false
 };
 EJS_VirtualGamepadSettings = [];
+EJS_defaultOptions = {
+  'mgba_frameskip': 'auto_threshold',
+  'mgba_frameskip_threshold': '33'
+};
 
 var gm = null;
 var started = false;
@@ -97,14 +104,6 @@ EJS_onGameStart = function() {
       p.style.border = 'none';
       p.style.overflow = 'hidden';
       p = p.parentElement;
-    }
-    // Disable interaction on all non-canvas elements
-    var game = document.getElementById('game');
-    var all = game.querySelectorAll('*');
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].tagName !== 'CANVAS') {
-        all[i].style.pointerEvents = 'none';
-      }
     }
   }, 1500);
 };
@@ -208,6 +207,12 @@ window.addEventListener('sideClick', tryResume);
 window.addEventListener('scrollUp', tryResume);
 window.addEventListener('scrollDown', tryResume);
 document.addEventListener('pointerdown', tryResume, true);
+
+// Prevent OS context menu in game zones — allowed in #menu-trigger zone (top-right)
+document.addEventListener('contextmenu', function(e) {
+  var px = e.clientX, py = e.clientY;
+  if (px > 60 || py > 60) e.preventDefault();
+}, true);
 </script>
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
