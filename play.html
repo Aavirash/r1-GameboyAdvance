@@ -48,7 +48,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_volume = 0.5;
+EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
   playPause:false, restart:false, mute:false, settings:false,
@@ -84,13 +84,36 @@ EJS_onGameStart = function() {
       dbg('gm err: ' + e.message);
     }
   }, 300);
-  // Hide virtual gamepad aggressively
   setInterval(function() {
     document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
       el.style.display = 'none';
       el.style.visibility = 'hidden';
     });
   }, 200);
+  // Fix screen fill + disable non-canvas interaction (runs after emulator fully initializes)
+  setTimeout(function() {
+    var cvs = document.querySelector('#game canvas');
+    if (!cvs) return;
+    cvs.style.objectFit = 'cover';
+    cvs.style.minWidth = '100%';
+    cvs.style.minHeight = '100%';
+    var p = cvs.parentElement;
+    while (p && p.id !== 'game') {
+      p.style.margin = '0';
+      p.style.padding = '0';
+      p.style.border = 'none';
+      p.style.overflow = 'hidden';
+      p = p.parentElement;
+    }
+    // Disable interaction on all non-canvas elements
+    var game = document.getElementById('game');
+    var all = game.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].tagName !== 'CANVAS') {
+        all[i].style.pointerEvents = 'none';
+      }
+    }
+  }, 1500);
 };
 
 // Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
@@ -117,7 +140,7 @@ function tap(btn, kc, ms) {
 
 // ─── R1 Controls ───
 var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
-var SUPER_LONG_MS = 2000, superLongTimer = null;
+var SUPER_LONG_MS = 4000, superLongTimer = null;
 
 // PTT: 1=A(btn8,kc90), 2=B(btn0,kc88)
 window.addEventListener('sideClick', function(){
@@ -150,9 +173,18 @@ window.addEventListener('longPressEnd', function(){
   release(3, 13);
 });
 
-// Scroll: R1 scrollUp = previous, scrollDown = next
-window.addEventListener('scrollDown', function(){ dbg('R dn'); tap(7, 39, 120); });
-window.addEventListener('scrollUp',   function(){ dbg('L up'); tap(6, 37, 120); });
+// Scroll: hold direction while scrolling — release 200ms after last scroll
+var scrollTimer = null, scrollDir = null;
+window.addEventListener('scrollDown', function(){
+  clearTimeout(scrollTimer);
+  if (scrollDir !== 7) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=7; press(7, 39); }
+  scrollTimer = setTimeout(function(){ if (scrollDir===7) { release(7,39); scrollDir=null; } }, 200);
+});
+window.addEventListener('scrollUp', function(){
+  clearTimeout(scrollTimer);
+  if (scrollDir !== 6) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=6; press(6, 37); }
+  scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
+});
 
 // Touch D-Pad
 var touchMap = {4:38, 5:40, 6:37, 7:39};
