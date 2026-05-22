@@ -9,13 +9,7 @@
 <title>R1GBA</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{
-  width:240px;height:282px;
-  overflow:hidden;
-  background:#000;
-  -webkit-user-select:none;user-select:none;
-  touch-action:none;
-}
+html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-select:none;user-select:none}
 #game{
   position:absolute;
   width:282px!important;height:240px!important;
@@ -25,13 +19,8 @@ html,body{
   background:#000;
   overflow:hidden;
 }
-#game canvas,.ejs_canvas,.ejs_parent canvas{
-  width:100%!important;
-  height:100%!important;
-  min-width:100%!important;
-  min-height:100%!important;
-  object-fit:fill!important;
-}
+#game canvas,.ejs_canvas{width:100%!important;height:100%!important}
+.ejs_parent canvas{width:100%!important;height:100%!important}
 /* Hide virtual gamepad and bottom bar */
 [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
@@ -42,6 +31,7 @@ html,body{
 </head>
 <body>
 <div id="game"></div>
+<div id="dbg" style="position:absolute;bottom:4px;left:4px;color:lime;font:10px monospace;z-index:9999;pointer-events:none"></div>
 
 <script>
 var romUrl = '';
@@ -58,7 +48,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_volume = 0.08;
+EJS_volume = 0.5;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
   playPause:false, restart:false, mute:false, settings:false,
@@ -71,17 +61,30 @@ EJS_VirtualGamepadSettings = [];
 
 var gm = null;
 var started = false;
+var dbgEl = document.getElementById('dbg');
+var dbgLines = [];
+function dbg(s) {
+  dbgLines.push(s);
+  if (dbgLines.length > 6) dbgLines.shift();
+  dbgEl.textContent = dbgLines.join('\n');
+}
 
+// EJS_onGameStart fires when game is actually running
 EJS_onGameStart = function() {
+  dbg('EJS_onGameStart fired');
   var tryGet = setInterval(function() {
     try {
       if (window.EJS_emulator && window.EJS_emulator.gameManager) {
         gm = window.EJS_emulator.gameManager;
         started = true;
+        dbg('gm OK simInput=' + (typeof gm.simulateInput));
         clearInterval(tryGet);
       }
-    } catch(e) {}
+    } catch(e) {
+      dbg('gm err: ' + e.message);
+    }
   }, 300);
+  // Hide virtual gamepad aggressively
   setInterval(function() {
     document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
       el.style.display = 'none';
@@ -90,22 +93,17 @@ EJS_onGameStart = function() {
   }, 200);
 };
 
-// Button indices: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
-// Visual landscape mapping (screen rotated -90deg):
-//   physical left  → game LEFT  (btn 6)
-//   physical right → game RIGHT (btn 7)
-//   physical top   → game UP    (btn 4)
-//   physical bottom→ game DOWN  (btn 5)
-// keyMap keyCodes: z=90, x=88, Enter=13, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
+// Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
+// keyMap keyCodes: z=90, x=88, Enter=13, Shift=16, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
 
 function doInput(btn, keyCode, val) {
   if (gm) {
-    try { gm.simulateInput(0, btn, val); return; } catch(e) {}
+    try { gm.simulateInput(0, btn, val); return; } catch(e) { dbg('sim err:'+e.message); }
   }
+  // Fallback: dispatch keyboard event with correct keyCode to #game
   var el = document.querySelector('#game');
-  if (!el) return;
-  var keyMap = {90:'z',88:'x',13:'Enter',16:'Shift',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'};
-  var keyName = keyMap[keyCode] || 'unknown';
+  if (!el) { dbg('no #game'); return; }
+  var keyName = {90:'z',88:'x',13:'Enter',16:'Shift',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[keyCode] || 'unknown';
   var evtType = val === 1 ? 'keydown' : 'keyup';
   el.dispatchEvent(new KeyboardEvent(evtType, {key:keyName, code:keyCode===16?'ShiftLeft':keyName, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
 }
@@ -128,9 +126,10 @@ window.addEventListener('sideClick', function(){
   clearTimeout(sideTimer);
   sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
   lastSide = now;
+  dbg('side cnt=' + sideCount);
   sideTimer = setTimeout(function(){
-    if (sideCount === 1) tap(8, 90, 80);       // A
-    else if (sideCount === 2) tap(0, 88, 80);   // B
+    if (sideCount === 1) { dbg('A'); tap(8, 90, 80); }
+    else if (sideCount === 2) { dbg('B'); tap(0, 88, 80); }
     sideCount = 0;
   }, 350);
 });
@@ -138,6 +137,7 @@ window.addEventListener('sideClick', function(){
 // Long press = Start(3,kc13). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
+  dbg('START dn');
   press(3, 13);
   superLongTimer = setTimeout(function(){
     if (longHeld) { release(3, 13); window.location.href = 'index.html'; }
@@ -146,28 +146,15 @@ window.addEventListener('longPressStart', function(){
 window.addEventListener('longPressEnd', function(){
   longHeld = false;
   clearTimeout(superLongTimer);
+  dbg('START up');
   release(3, 13);
 });
 
-// Scroll: hold direction while scrolling — release 200ms after last scroll
-var scrollTimer = null, scrollDir = null;
-window.addEventListener('scrollDown', function(){
-  clearTimeout(scrollTimer);
-  if (scrollDir !== 7) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=7; press(7, 39); }
-  scrollTimer = setTimeout(function(){ if (scrollDir===7) { release(7,39); scrollDir=null; } }, 200);
-});
-window.addEventListener('scrollUp', function(){
-  clearTimeout(scrollTimer);
-  if (scrollDir !== 6) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=6; press(6, 37); }
-  scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
-});
+// Scroll: R1 scrollUp = previous, scrollDown = next
+window.addEventListener('scrollDown', function(){ dbg('R dn'); tap(7, 39, 120); });
+window.addEventListener('scrollUp',   function(){ dbg('L up'); tap(6, 37, 120); });
 
-// ─── Touch D-Pad (landscape orientation) ───
-// Screen rotated -90deg: map touch zones to VISUAL directions
-//   px < 80  (physical left)   → game LEFT  (btn 6, kc 37)
-//   px > 160 (physical right)  → game RIGHT (btn 7, kc 39)
-//   py < 80  (physical top)    → game UP    (btn 4, kc 38)
-//   py > 200 (physical bottom) → game DOWN  (btn 5, kc 40)
+// Touch D-Pad
 var touchMap = {4:38, 5:40, 6:37, 7:39};
 var touchDirs = {}, touchActive = false;
 document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
@@ -179,10 +166,10 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  if (px < 80)  nd[6] = true;  // LEFT
-  if (px > 160) nd[7] = true;  // RIGHT
-  if (py < 80)  nd[4] = true;  // UP
-  if (py > 200) nd[5] = true;  // DOWN
+  if (px < 80)  nd[4] = true;
+  if (px > 160) nd[5] = true;
+  if (py < 80)  nd[7] = true;
+  if (py > 200) nd[6] = true;
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
@@ -191,12 +178,6 @@ function releaseTouch() {
   for (var k in touchDirs) release(parseInt(k), touchMap[k]);
   touchDirs = {};
 }
-
-// Prevent default browser gestures & navigation
-document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, true);
-document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, true);
-document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, true);
-document.addEventListener('gestureend', function(e){ e.preventDefault(); }, true);
 
 // Audio resume
 function tryResume() {
