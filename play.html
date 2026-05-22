@@ -57,6 +57,7 @@ EJS_Buttons = {
   cacheManager:false, exitEmulation:false
 };
 EJS_VirtualGamepadSettings = [];
+EJS_videoRotation = 1;
 
 var gm = null;
 var started = false;
@@ -187,10 +188,9 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  if (px < 80)  nd[4] = true;
-  if (px > 160) nd[5] = true;
-  if (py < 80)  nd[7] = true;
-  if (py > 200) nd[6] = true;
+  // Left side only: upper = UP, lower = DOWN. Right side = empty.
+  if (px < 80 && py < 141) nd[4] = true;  // UP
+  if (px < 80 && py >= 141) nd[5] = true; // DOWN
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
