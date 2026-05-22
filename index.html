@@ -136,7 +136,7 @@ function selectGame(idx) {
   if (idx < 0 || idx >= GAMES.length) return;
   var g = GAMES[idx];
   var romUrl = g.url || (ROM_BASE + g.id + '.gba');
-  window.location.href = 'play.html?rom=' + encodeURIComponent(romUrl);
+  window.location.href = 'play.html?rom=' + encodeURIComponent(romUrl) + '&_=' + Date.now();
 }
 
 function menuUp()   { if (menuIndex > 0) { menuIndex--; renderMenu(); } }
