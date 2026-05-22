@@ -31,7 +31,6 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 </head>
 <body>
 <div id="game"></div>
-<div id="dbg" style="position:absolute;bottom:4px;left:4px;color:lime;font:10px monospace;z-index:9999;pointer-events:none"></div>
 
 <script>
 var romUrl = '';
@@ -61,28 +60,16 @@ EJS_VirtualGamepadSettings = [];
 
 var gm = null;
 var started = false;
-var dbgEl = document.getElementById('dbg');
-var dbgLines = [];
-function dbg(s) {
-  dbgLines.push(s);
-  if (dbgLines.length > 6) dbgLines.shift();
-  dbgEl.textContent = dbgLines.join('\n');
-}
 
-// EJS_onGameStart fires when game is actually running
 EJS_onGameStart = function() {
-  dbg('EJS_onGameStart fired');
   var tryGet = setInterval(function() {
     try {
       if (window.EJS_emulator && window.EJS_emulator.gameManager) {
         gm = window.EJS_emulator.gameManager;
         started = true;
-        dbg('gm OK simInput=' + (typeof gm.simulateInput));
         clearInterval(tryGet);
       }
-    } catch(e) {
-      dbg('gm err: ' + e.message);
-    }
+    } catch(e) {}
   }, 300);
   setInterval(function() {
     document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
@@ -121,11 +108,10 @@ EJS_onGameStart = function() {
 
 function doInput(btn, keyCode, val) {
   if (gm) {
-    try { gm.simulateInput(0, btn, val); return; } catch(e) { dbg('sim err:'+e.message); }
+    try { gm.simulateInput(0, btn, val); return; } catch(e) {}
   }
-  // Fallback: dispatch keyboard event with correct keyCode to #game
   var el = document.querySelector('#game');
-  if (!el) { dbg('no #game'); return; }
+  if (!el) return;
   var keyName = {90:'z',88:'x',13:'Enter',16:'Shift',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[keyCode] || 'unknown';
   var evtType = val === 1 ? 'keydown' : 'keyup';
   el.dispatchEvent(new KeyboardEvent(evtType, {key:keyName, code:keyCode===16?'ShiftLeft':keyName, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
@@ -149,10 +135,9 @@ window.addEventListener('sideClick', function(){
   clearTimeout(sideTimer);
   sideCount = (now - lastSide < 350) ? sideCount + 1 : 1;
   lastSide = now;
-  dbg('side cnt=' + sideCount);
   sideTimer = setTimeout(function(){
-    if (sideCount === 1) { dbg('A'); tap(8, 90, 80); }
-    else if (sideCount === 2) { dbg('B'); tap(0, 88, 80); }
+    if (sideCount === 1) tap(8, 90, 80);
+    else if (sideCount === 2) tap(0, 88, 80);
     sideCount = 0;
   }, 350);
 });
@@ -160,7 +145,6 @@ window.addEventListener('sideClick', function(){
 // Long press = Start(3,kc13). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
-  dbg('START dn');
   press(3, 13);
   superLongTimer = setTimeout(function(){
     if (longHeld) { release(3, 13); window.location.href = 'index.html'; }
@@ -169,7 +153,6 @@ window.addEventListener('longPressStart', function(){
 window.addEventListener('longPressEnd', function(){
   longHeld = false;
   clearTimeout(superLongTimer);
-  dbg('START up');
   release(3, 13);
 });
 
