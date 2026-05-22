@@ -81,11 +81,17 @@ EJS_onGameStart = function() {
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
     if (!cvs) return;
-    cvs.style.objectFit = 'cover';
+    cvs.style.width = '100%';
+    cvs.style.height = '100%';
     cvs.style.minWidth = '100%';
     cvs.style.minHeight = '100%';
+    cvs.style.objectFit = 'fill';
     var p = cvs.parentElement;
     while (p && p.id !== 'game') {
+      p.style.width = '100%';
+      p.style.height = '100%';
+      p.style.minWidth = '100%';
+      p.style.minHeight = '100%';
       p.style.margin = '0';
       p.style.padding = '0';
       p.style.border = 'none';
