@@ -187,11 +187,10 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  // Physical right side (px > 140) = visual bottom after -90° rotate
-  // Split horizontal (py) for visual left/right
-  // UP on visual bottom-left, DOWN on visual bottom-right — thumb can reach both
-  if (px > 140 && py < 141) nd[4] = true;  // UP
-  if (px > 140 && py >= 141) nd[5] = true; // DOWN
+  // Visual left side (physical top = small py) after -90° rotate
+  // UP above DOWN, close together on the left edge
+  if (py < 80 && px < 120) nd[4] = true;   // UP
+  if (py < 80 && px >= 120) nd[5] = true;  // DOWN
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
