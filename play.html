@@ -205,11 +205,12 @@
                 exitEmulation: false,
             };
             EJS_defaultOptions = {
-                mgba_frameskip: 1,
+                mgba_frameskip: 2,
                 mgba_frameskip_threshold: "33",
                 mgba_idle_optimization: "Detect and Remove",
-                audio_latency: "256",
+                audio_latency: "512",
                 audio_sync: "true",
+                mgba_audio_low_pass_filter: "enabled",
             };
 
             var gm = null,
