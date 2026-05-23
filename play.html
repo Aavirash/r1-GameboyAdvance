@@ -1,242 +1,458 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=240,initial-scale=1.0,user-scalable=no">
-<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>R1GBA</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-select:none;user-select:none}
-#game{
-  position:absolute;
-  width:282px!important;height:240px!important;
-  left:-21px;top:21px;
-  transform:rotate(-90deg);
-  transform-origin:center center;
-  background:#000;
-  overflow:hidden;
-}
-#game canvas,.ejs_canvas{width:100%!important;height:100%!important;image-rendering:pixelated}
-.ejs_parent canvas{width:100%!important;height:100%!important}
-#menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
-[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="ejs_bottom"]{display:none!important}
-#gp{position:fixed;inset:0;z-index:2147483647;pointer-events:none;will-change:transform;isolation:isolate}
-.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;transform:rotate(-90deg)}
-.gp-btn:active{background:rgba(255,255,255,0.25)!important}
-#gp-up{top:140px;right:14px;width:40px;height:40px}
-#gp-down{top:220px;right:14px;width:40px;height:40px}
-#gp-left{top:178px;right:0;width:32px;height:40px}
-#gp-right{top:178px;right:54px;width:32px;height:40px}
-#gp-a{top:140px;left:14px;width:44px;height:44px;border-radius:50%}
-#gp-b{top:220px;left:14px;width:44px;height:44px;border-radius:50%}
-</style>
-</head>
-<body>
-<div id="game"></div>
-<div id="menu-trigger"></div>
-<div id="gp">
-  <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
-  <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
-  <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
-  <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
-  <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
-  <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
-</div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=240,initial-scale=1.0,user-scalable=no"
+        />
+        <meta
+            http-equiv="Cache-Control"
+            content="no-cache,no-store,must-revalidate"
+        />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
+        <title>R1GBA</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            html,
+            body {
+                width: 240px;
+                height: 282px;
+                overflow: hidden;
+                background: #000;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            #game {
+                position: absolute;
+                width: 282px !important;
+                height: 240px !important;
+                left: -21px;
+                top: 21px;
+                transform: rotate(-90deg);
+                transform-origin: center center;
+                background: #000;
+                overflow: hidden;
+            }
+            #game canvas,
+            .ejs_canvas {
+                width: 100% !important;
+                height: 100% !important;
+                image-rendering: pixelated;
+            }
+            .ejs_parent canvas {
+                width: 100% !important;
+                height: 100% !important;
+            }
+            #menu-trigger {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 60px;
+                height: 60px;
+                z-index: 9999;
+                touch-action: auto;
+                pointer-events: auto;
+                background: transparent;
+            }
+            [class*="virtual"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            [class*="gamepad"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            [class*="Gamepad"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            [class*="nipple"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            [class*="ejs_bottom"] {
+                display: none !important;
+            }
+            #gp {
+                position: fixed;
+                inset: 0;
+                z-index: 2147483647;
+                pointer-events: none;
+                will-change: transform;
+                isolation: isolate;
+            }
+            .gp-btn {
+                position: absolute;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: rgba(255, 255, 255, 0.5);
+                font-size: 11px;
+                font-weight: 700;
+                pointer-events: auto;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                transform: rotate(-90deg);
+            }
+            .gp-btn:active {
+                background: rgba(255, 255, 255, 0.25) !important;
+            }
+            #gp-up {
+                top: 242px;
+                left: 14px;
+                width: 36px;
+                height: 36px;
+            }
+            #gp-down {
+                top: 242px;
+                right: 14px;
+                width: 36px;
+                height: 36px;
+            }
+            #gp-left {
+                display: none !important;
+            }
+            #gp-right {
+                display: none !important;
+            }
+            #gp-a {
+                top: 20px;
+                right: 14px;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+            }
+            #gp-b {
+                top: 36px;
+                right: 54px;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="game"></div>
+        <div id="menu-trigger"></div>
+        <div id="gp">
+            <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
+            <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
+            <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
+            <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
+            <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
+            <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+        </div>
 
-<script>
-var romUrl = '';
-var m = location.search.match(/[?&]rom=([^&]+)/);
-if (m) {
-  romUrl = decodeURIComponent(m[1]);
-  if (!romUrl.match(/^https?:\/\//) && romUrl.match(/^[a-zA-Z0-9_-]+$/)) {
-    romUrl = 'https://drive.usercontent.google.com/download?id=' + romUrl + '&export=download';
-  }
-}
+        <script>
+            var romUrl = "";
+            var m = location.search.match(/[?&]rom=([^&]+)/);
+            if (m) {
+                romUrl = decodeURIComponent(m[1]);
+                if (
+                    !romUrl.match(/^https?:\/\//) &&
+                    romUrl.match(/^[a-zA-Z0-9_-]+$/)
+                ) {
+                    romUrl =
+                        "https://drive.usercontent.google.com/download?id=" +
+                        romUrl +
+                        "&export=download";
+                }
+            }
 
-EJS_player = '#game';
-EJS_core = 'gba';
-EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
-EJS_gameUrl = romUrl;
-EJS_startOnLoaded = true;
-EJS_volume = 0.08;
-EJS_backgroundColor = '#000';
-EJS_Buttons = {
-  playPause:false, restart:false, mute:false, settings:false,
-  fullscreen:false, saveState:false, loadState:false, screenRecord:false,
-  gamepad:false, cheat:false, volume:false, saveSavFiles:false,
-  loadSavFiles:false, quickSave:false, quickLoad:false, screenshot:false,
-  cacheManager:false, exitEmulation:false
-};
-EJS_defaultOptions = {
-  'mgba_frameskip': 'auto_threshold',
-  'mgba_frameskip_threshold': '33',
-  'mgba_idle_optimization': 'Detect and Remove'
-};
+            EJS_player = "#game";
+            EJS_core = "gba";
+            EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+            EJS_gameUrl = romUrl;
+            EJS_startOnLoaded = true;
+            EJS_volume = 0.08;
+            EJS_backgroundColor = "#000";
+            EJS_Buttons = {
+                playPause: false,
+                restart: false,
+                mute: false,
+                settings: false,
+                fullscreen: false,
+                saveState: false,
+                loadState: false,
+                screenRecord: false,
+                gamepad: false,
+                cheat: false,
+                volume: false,
+                saveSavFiles: false,
+                loadSavFiles: false,
+                quickSave: false,
+                quickLoad: false,
+                screenshot: false,
+                cacheManager: false,
+                exitEmulation: false,
+            };
+            EJS_defaultOptions = {
+                mgba_frameskip: "auto_threshold",
+                mgba_frameskip_threshold: "33",
+                mgba_idle_optimization: "Detect and Remove",
+            };
 
-var gm = null, started = false;
+            var gm = null,
+                started = false;
 
-EJS_onGameStart = function() {
-  var tryGet = setInterval(function() {
-    try {
-      if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-        gm = window.EJS_emulator.gameManager;
-        started = true;
-        clearInterval(tryGet);
-      }
-    } catch(e) {}
-  }, 300);
-  setTimeout(function() {
-    var cvs = document.querySelector('#game canvas');
-    if (!cvs) return;
-    cvs.style.width = '100%';
-    cvs.style.height = '100%';
-    cvs.style.minWidth = '100%';
-    cvs.style.minHeight = '100%';
-    cvs.style.objectFit = 'fill';
-    var p = cvs.parentElement;
-    while (p && p.id !== 'game') {
-      p.style.width = '100%';
-      p.style.height = '100%';
-      p.style.minWidth = '100%';
-      p.style.minHeight = '100%';
-      p.style.margin = '0';
-      p.style.padding = '0';
-      p.style.border = 'none';
-      p.style.overflow = 'hidden';
-      p = p.parentElement;
-    }
-  }, 1500);
-};
+            EJS_onGameStart = function () {
+                var tryGet = setInterval(function () {
+                    try {
+                        if (
+                            window.EJS_emulator &&
+                            window.EJS_emulator.gameManager
+                        ) {
+                            gm = window.EJS_emulator.gameManager;
+                            started = true;
+                            clearInterval(tryGet);
+                        }
+                    } catch (e) {}
+                }, 300);
+                setTimeout(function () {
+                    var cvs = document.querySelector("#game canvas");
+                    if (!cvs) return;
+                    cvs.style.width = "100%";
+                    cvs.style.height = "100%";
+                    cvs.style.minWidth = "100%";
+                    cvs.style.minHeight = "100%";
+                    cvs.style.objectFit = "fill";
+                    var p = cvs.parentElement;
+                    while (p && p.id !== "game") {
+                        p.style.width = "100%";
+                        p.style.height = "100%";
+                        p.style.minWidth = "100%";
+                        p.style.minHeight = "100%";
+                        p.style.margin = "0";
+                        p.style.padding = "0";
+                        p.style.border = "none";
+                        p.style.overflow = "hidden";
+                        p = p.parentElement;
+                    }
+                }, 1500);
+            };
 
-function doInput(btn, keyCode, val) {
-  if (gm) {
-    try { gm.simulateInput(0, btn, val); return; } catch(e) {}
-  }
-  var el = document.querySelector('#game');
-  if (!el) return;
-  var keyName = {90:'z',88:'x',13:'Enter',16:'Shift',37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown'}[keyCode] || 'unknown';
-  var evtType = val === 1 ? 'keydown' : 'keyup';
-  el.dispatchEvent(new KeyboardEvent(evtType, {key:keyName, code:keyCode===16?'ShiftLeft':keyName, keyCode:keyCode, which:keyCode, bubbles:true, cancelable:true}));
-}
+            function doInput(btn, keyCode, val) {
+                if (gm) {
+                    try {
+                        gm.simulateInput(0, btn, val);
+                        return;
+                    } catch (e) {}
+                }
+                var el = document.querySelector("#game");
+                if (!el) return;
+                var keyName =
+                    {
+                        90: "z",
+                        88: "x",
+                        13: "Enter",
+                        16: "Shift",
+                        37: "ArrowLeft",
+                        38: "ArrowUp",
+                        39: "ArrowRight",
+                        40: "ArrowDown",
+                    }[keyCode] || "unknown";
+                var evtType = val === 1 ? "keydown" : "keyup";
+                el.dispatchEvent(
+                    new KeyboardEvent(evtType, {
+                        key: keyName,
+                        code: keyCode === 16 ? "ShiftLeft" : keyName,
+                        keyCode: keyCode,
+                        which: keyCode,
+                        bubbles: true,
+                        cancelable: true,
+                    }),
+                );
+            }
 
-function press(btn, kc) { doInput(btn, kc, 1); }
-function release(btn, kc) { doInput(btn, kc, 0); }
-function tap(btn, kc, ms) {
-  press(btn, kc);
-  setTimeout(function(){ release(btn, kc); }, ms || 80);
-}
+            function press(btn, kc) {
+                doInput(btn, kc, 1);
+            }
+            function release(btn, kc) {
+                doInput(btn, kc, 0);
+            }
+            function tap(btn, kc, ms) {
+                press(btn, kc);
+                setTimeout(function () {
+                    release(btn, kc);
+                }, ms || 80);
+            }
 
-document.querySelectorAll('.gp-btn').forEach(function(el) {
-  var btn = parseInt(el.dataset.btn);
-  var kc = parseInt(el.dataset.kc);
-  el.addEventListener('pointerdown', function(e) { e.preventDefault(); press(btn, kc); });
-  el.addEventListener('pointerup', function(e) { e.preventDefault(); release(btn, kc); });
-  el.addEventListener('pointerleave', function() { release(btn, kc); });
-  el.addEventListener('pointercancel', function() { release(btn, kc); });
-});
+            document.querySelectorAll(".gp-btn").forEach(function (el) {
+                var btn = parseInt(el.dataset.btn);
+                var kc = parseInt(el.dataset.kc);
+                el.addEventListener("pointerdown", function (e) {
+                    e.preventDefault();
+                    press(btn, kc);
+                });
+                el.addEventListener("pointerup", function (e) {
+                    e.preventDefault();
+                    release(btn, kc);
+                });
+                el.addEventListener("pointerleave", function () {
+                    release(btn, kc);
+                });
+                el.addEventListener("pointercancel", function () {
+                    release(btn, kc);
+                });
+            });
 
-var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
-var SUPER_LONG_MS = 4000, superLongTimer = null;
+            var sideCount = 0,
+                lastSide = 0,
+                sideTimer = null,
+                longHeld = false;
+            var SUPER_LONG_MS = 4000,
+                superLongTimer = null;
 
-window.addEventListener('sideClick', function(){
-  if (longHeld) return;
-  var now = Date.now();
-  clearTimeout(sideTimer);
-  if (now - lastSide < 250) {
-    release(8, 90);
-    tap(0, 88, 80);
-    sideCount = 0;
-  } else {
-    press(8, 90);
-    sideCount = 1;
-    sideTimer = setTimeout(function(){
-      if (sideCount === 1) { release(8, 90); sideCount = 0; }
-    }, 200);
-  }
-  lastSide = now;
-});
+            window.addEventListener("sideClick", function () {
+                if (longHeld) return;
+                var now = Date.now();
+                clearTimeout(sideTimer);
+                if (now - lastSide < 250) {
+                    release(8, 90);
+                    tap(0, 88, 80);
+                    sideCount = 0;
+                } else {
+                    press(8, 90);
+                    sideCount = 1;
+                    sideTimer = setTimeout(function () {
+                        if (sideCount === 1) {
+                            release(8, 90);
+                            sideCount = 0;
+                        }
+                    }, 200);
+                }
+                lastSide = now;
+            });
 
-window.addEventListener('longPressStart', function(){
-  longHeld = true;
-  press(3, 13);
-  superLongTimer = setTimeout(function(){
-    if (longHeld) { release(3, 13); window.location.href = 'index.html'; }
-  }, SUPER_LONG_MS);
-});
-window.addEventListener('longPressEnd', function(){
-  longHeld = false;
-  clearTimeout(superLongTimer);
-  release(3, 13);
-});
+            window.addEventListener("longPressStart", function () {
+                longHeld = true;
+                press(3, 13);
+                superLongTimer = setTimeout(function () {
+                    if (longHeld) {
+                        release(3, 13);
+                        window.location.href = "index.html";
+                    }
+                }, SUPER_LONG_MS);
+            });
+            window.addEventListener("longPressEnd", function () {
+                longHeld = false;
+                clearTimeout(superLongTimer);
+                release(3, 13);
+            });
 
-var scrollTimer = null, scrollDir = null;
-window.addEventListener('scrollDown', function(){
-  clearTimeout(scrollTimer);
-  if (scrollDir !== 7) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=7; press(7, 39); }
-  scrollTimer = setTimeout(function(){ if (scrollDir===7) { release(7,39); scrollDir=null; } }, 200);
-});
-window.addEventListener('scrollUp', function(){
-  clearTimeout(scrollTimer);
-  if (scrollDir !== 6) { if (scrollDir !== null) release(scrollDir, scrollDir===7?39:37); scrollDir=6; press(6, 37); }
-  scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
-});
+            var scrollTimer = null,
+                scrollDir = null;
+            window.addEventListener("scrollDown", function () {
+                clearTimeout(scrollTimer);
+                if (scrollDir !== 7) {
+                    if (scrollDir !== null)
+                        release(scrollDir, scrollDir === 7 ? 39 : 37);
+                    scrollDir = 7;
+                    press(7, 39);
+                }
+                scrollTimer = setTimeout(function () {
+                    if (scrollDir === 7) {
+                        release(7, 39);
+                        scrollDir = null;
+                    }
+                }, 200);
+            });
+            window.addEventListener("scrollUp", function () {
+                clearTimeout(scrollTimer);
+                if (scrollDir !== 6) {
+                    if (scrollDir !== null)
+                        release(scrollDir, scrollDir === 7 ? 39 : 37);
+                    scrollDir = 6;
+                    press(6, 37);
+                }
+                scrollTimer = setTimeout(function () {
+                    if (scrollDir === 6) {
+                        release(6, 37);
+                        scrollDir = null;
+                    }
+                }, 200);
+            });
 
-function tryResumeCtx() {
-  try { var ctx = window.AudioContext && (window.AudioContext._inst || new AudioContext()); if (ctx && ctx.state === 'suspended') ctx.resume(); } catch(e) {}
-}
-window.addEventListener('sideClick', tryResumeCtx);
-window.addEventListener('scrollUp', tryResumeCtx);
+            function tryResumeCtx() {
+                try {
+                    var ctx =
+                        window.AudioContext &&
+                        (window.AudioContext._inst || new AudioContext());
+                    if (ctx && ctx.state === "suspended") ctx.resume();
+                } catch (e) {}
+            }
+            window.addEventListener("sideClick", tryResumeCtx);
+            window.addEventListener("scrollUp", tryResumeCtx);
 
-document.addEventListener('contextmenu', function(e) {
-  var px = e.clientX, py = e.clientY;
-  if (px > 60 || py > 60) e.preventDefault();
-}, true);
+            document.addEventListener(
+                "contextmenu",
+                function (e) {
+                    var px = e.clientX,
+                        py = e.clientY;
+                    if (px > 60 || py > 60) e.preventDefault();
+                },
+                true,
+            );
 
-// Swipe-up from bottom to toggle emulator settings overlay
-var swipeY = null;
-document.addEventListener('pointerdown', function(e) {
-  if (e.clientY > 260) swipeY = e.clientY;
-});
-document.addEventListener('pointerup', function(e) {
-  if (swipeY !== null && e.clientY < swipeY - 30) {
-    var sb = document.querySelector('.ejs_settings_btn, [class*="settings"], [class*="Settings"]');
-    if (sb) sb.click();
-  }
-  swipeY = null;
-});
+            // Swipe-up from bottom to toggle emulator settings overlay
+            var swipeY = null;
+            document.addEventListener("pointerdown", function (e) {
+                if (e.clientY > 260) swipeY = e.clientY;
+            });
+            document.addEventListener("pointerup", function (e) {
+                if (swipeY !== null && e.clientY < swipeY - 30) {
+                    var sb = document.querySelector(
+                        '.ejs_settings_btn, [class*="settings"], [class*="Settings"]',
+                    );
+                    if (sb) sb.click();
+                }
+                swipeY = null;
+            });
 
-// Force #gp to stay on top after emulator loads (canvas can cover it)
-(function keepGPVisible() {
-  var gp = document.getElementById('gp');
-  if (!gp) return;
-  var keep = setInterval(function() {
-    if (gp.parentNode !== document.body) {
-      document.body.appendChild(gp);
-    }
-    gp.style.display = 'flex';
-    gp.style.zIndex = '2147483647';
-    gp.style.transform = 'none';
-    // Re-append as last child every poll to stay above any dynamic elements
-    document.body.appendChild(gp);
-  }, 1000);
-  // Also fix on any DOM mutation
-  var obs = new MutationObserver(function() {
-    if (gp.parentNode !== document.body) {
-      document.body.appendChild(gp);
-    }
-  });
-  obs.observe(document.body, {childList: true, subtree: true});
-  // Stop interval after 30 seconds
-  setTimeout(function() { clearInterval(keep); obs.disconnect(); }, 30000);
-})();
-</script>
-<script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
-</body>
+            // Force #gp to stay on top after emulator loads (canvas can cover it)
+            (function keepGPVisible() {
+                var gp = document.getElementById("gp");
+                if (!gp) return;
+                var keep = setInterval(function () {
+                    if (gp.parentNode !== document.body) {
+                        document.body.appendChild(gp);
+                    }
+                    gp.style.display = "flex";
+                    gp.style.zIndex = "2147483647";
+                    gp.style.transform = "none";
+                    // Re-append as last child every poll to stay above any dynamic elements
+                    document.body.appendChild(gp);
+                }, 1000);
+                // Also fix on any DOM mutation
+                var obs = new MutationObserver(function () {
+                    if (gp.parentNode !== document.body) {
+                        document.body.appendChild(gp);
+                    }
+                });
+                obs.observe(document.body, { childList: true, subtree: true });
+                // Stop interval after 30 seconds
+                setTimeout(function () {
+                    clearInterval(keep);
+                    obs.disconnect();
+                }, 30000);
+            })();
+        </script>
+        <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+    </body>
 </html>
