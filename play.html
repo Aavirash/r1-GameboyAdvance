@@ -27,28 +27,29 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 [class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="ejs_bottom"]{display:none!important}
-#gp{position:fixed;inset:0;z-index:10;pointer-events:none}
-.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:10px;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border-radius:4px}
-.gp-btn:active{background:rgba(255,255,255,0.15)!important}
-#gp-up{left:4px;bottom:112px;width:36px;height:36px}
-#gp-down{left:4px;bottom:50px;width:36px;height:36px}
-#gp-left{left:4px;bottom:76px;width:36px;height:28px}
-#gp-right{left:4px;bottom:76px;width:36px;height:28px;margin-left:40px}
-#gp-a{right:8px;bottom:78px;width:40px;height:40px;border-radius:50%}
-#gp-b{right:8px;bottom:30px;width:40px;height:40px;border-radius:50%}
+#gp{position:absolute;inset:0;z-index:1000;pointer-events:none}
+.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:9px;font-weight:600;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
+.gp-btn:active{background:rgba(255,255,255,0.18)!important}
+#gp-up{left:62px;top:20px;width:24px;height:24px}
+#gp-down{left:42px;top:20px;width:24px;height:24px}
+#gp-left{left:52px;top:6px;width:20px;height:20px}
+#gp-right{left:52px;top:34px;width:20px;height:20px}
+#gp-a{left:62px;top:195px;width:26px;height:26px;border-radius:50%}
+#gp-b{left:42px;top:195px;width:26px;height:26px;border-radius:50%}
 </style>
 </head>
 <body>
-<div id="game"></div>
-<div id="menu-trigger"></div>
-<div id="gp">
-  <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
-  <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
-  <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
-  <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
-  <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
-  <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+<div id="game">
+  <div id="gp">
+    <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
+    <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
+    <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
+    <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
+    <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
+    <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+  </div>
 </div>
+<div id="menu-trigger"></div>
 
 <script>
 var romUrl = '';
