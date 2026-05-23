@@ -23,12 +23,11 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 .ejs_parent canvas{width:100%!important;height:100%!important}
 #menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
 #game{touch-action:none}
-.touch-label{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.18);font-size:11px;pointer-events:none;z-index:1}
-#tl-wrap{position:fixed;inset:0;z-index:1;pointer-events:none;transform:rotate(-90deg)}
-#tl-up{left:4px;bottom:4px;width:70px;height:62px}
-#tl-down{right:4px;bottom:4px;width:70px;height:62px}
-#tl-a{left:4px;top:4px;width:70px;height:62px}
-#tl-b{right:4px;top:4px;width:70px;height:62px}
+.touch-label{position:fixed;width:72px;height:64px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.18);font-size:11px;font-weight:600;pointer-events:none;z-index:1;transform:rotate(-90deg)}
+#tl-up{left:4px;bottom:4px}
+#tl-down{right:4px;bottom:4px}
+#tl-a{left:4px;top:4px}
+#tl-b{right:4px;top:4px}
 /* Hide virtual gamepad and bottom bar */
 [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
@@ -40,12 +39,10 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 <body>
 <div id="game"></div>
 <div id="menu-trigger"></div>
-<div id="tl-wrap">
-  <div class="touch-label" id="tl-up">▲</div>
-  <div class="touch-label" id="tl-down">▼</div>
-  <div class="touch-label" id="tl-a">A</div>
-  <div class="touch-label" id="tl-b">B</div>
-</div>
+<div id="tl-up" class="touch-label">▲</div>
+<div id="tl-down" class="touch-label">▼</div>
+<div id="tl-a" class="touch-label">A</div>
+<div id="tl-b" class="touch-label">B</div>
 
 <script>
 var romUrl = '';
@@ -62,6 +59,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
+EJS_threads = true;
 EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
@@ -91,13 +89,10 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
-  setInterval(function() {
-    document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
-      el.style.display = 'none';
-      el.style.visibility = 'hidden';
-    });
-  }, 200);
-  // Fix screen fill + disable non-canvas interaction (runs after emulator fully initializes)
+  // Single cleanup + observer for virtual gamepad hiding
+  hideVirtualUI();
+  new MutationObserver(hideVirtualUI).observe(document.body, { childList: true, subtree: true });
+  // Fix screen fill after emulator fully initializes
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
     if (!cvs) return;
@@ -120,6 +115,12 @@ EJS_onGameStart = function() {
     }
   }, 1500);
 };
+function hideVirtualUI() {
+  document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
+    el.style.display = 'none';
+    el.style.visibility = 'hidden';
+  });
+}
 
 // Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
 // keyMap keyCodes: z=90, x=88, Enter=13, Shift=16, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
@@ -221,14 +222,12 @@ function releaseTouch() {
   touchDirs = {};
 }
 
-// Audio resume
-function tryResume() {
-  try { if (window.AudioContext && window.AudioContext.prototype.resume) window.AudioContext.prototype.resume(); } catch(e) {}
+// Audio resume — emulator manages its own AudioContext
+function tryResumeCtx() {
+  try { var ctx = window.AudioContext && (window.AudioContext._inst || new AudioContext()); if (ctx && ctx.state === 'suspended') ctx.resume(); } catch(e) {}
 }
-window.addEventListener('sideClick', tryResume);
-window.addEventListener('scrollUp', tryResume);
-window.addEventListener('scrollDown', tryResume);
-document.addEventListener('pointerdown', tryResume, true);
+window.addEventListener('sideClick', tryResumeCtx);
+window.addEventListener('scrollUp', tryResumeCtx);
 
 // Prevent OS context menu in game zones — allowed in #menu-trigger zone (top-right)
 document.addEventListener('contextmenu', function(e) {
