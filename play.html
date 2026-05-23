@@ -27,15 +27,15 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 [class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="ejs_bottom"]{display:none!important}
-#gp{position:absolute;inset:0;z-index:1000;pointer-events:none}
-.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:9px;font-weight:600;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
-.gp-btn:active{background:rgba(255,255,255,0.18)!important}
-#gp-up{left:62px;top:20px;width:24px;height:24px}
-#gp-down{left:42px;top:20px;width:24px;height:24px}
-#gp-left{left:52px;top:6px;width:20px;height:20px}
-#gp-right{left:52px;top:34px;width:20px;height:20px}
-#gp-a{left:62px;top:195px;width:26px;height:26px;border-radius:50%}
-#gp-b{left:42px;top:195px;width:26px;height:26px;border-radius:50%}
+#gp{position:absolute;inset:0;z-index:999999;pointer-events:none}
+.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:3px}
+.gp-btn:active{background:rgba(255,255,255,0.25)!important}
+#gp-up{left:62px;top:15px;width:32px;height:32px}
+#gp-down{left:38px;top:15px;width:32px;height:32px}
+#gp-left{left:50px;top:4px;width:32px;height:22px}
+#gp-right{left:50px;top:36px;width:32px;height:22px}
+#gp-a{left:62px;top:190px;width:34px;height:34px;border-radius:50%}
+#gp-b{left:38px;top:190px;width:34px;height:34px;border-radius:50%}
 </style>
 </head>
 <body>
@@ -94,6 +94,12 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
+  // Re-parent gp to end of #game so it stacks above emulator elements
+  setTimeout(function() {
+    var gp = document.getElementById('gp');
+    var game = document.getElementById('game');
+    if (gp && game) game.appendChild(gp);
+  }, 100);
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
     if (!cvs) return;
