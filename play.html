@@ -19,10 +19,15 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
   background:#000;
   overflow:hidden;
 }
-#game canvas,.ejs_canvas{width:100%!important;height:100%!important}
+#game canvas,.ejs_canvas{width:100%!important;height:100%!important;will-change:transform;image-rendering:pixelated}
 .ejs_parent canvas{width:100%!important;height:100%!important}
 #menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
-#game{touch-action:none}
+#game{touch-action:none;will-change:transform}
+.touch-label{position:fixed;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.12);font-size:9px;letter-spacing:0.5px;pointer-events:none;z-index:1}
+#tl-up{left:0;bottom:0;width:80px;height:72px}
+#tl-down{right:0;bottom:0;width:80px;height:72px}
+#tl-a{left:0;top:0;width:80px;height:60px}
+#tl-b{right:0;top:0;width:80px;height:60px}
 /* Hide virtual gamepad and bottom bar */
 [class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
@@ -34,6 +39,10 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 <body>
 <div id="game"></div>
 <div id="menu-trigger"></div>
+<div class="touch-label" id="tl-up">▲</div>
+<div class="touch-label" id="tl-down">▼</div>
+<div class="touch-label" id="tl-a">A</div>
+<div class="touch-label" id="tl-b">B</div>
 
 <script>
 var romUrl = '';
@@ -62,8 +71,8 @@ EJS_Buttons = {
 EJS_VirtualGamepadSettings = [];
 EJS_defaultOptions = {
   'mgba_frameskip': 'auto_threshold',
-  'mgba_frameskip_threshold': '39',
-  'mgba_idle_optimization': 'Detect and Remove'
+  'mgba_frameskip_threshold': '50',
+  'mgba_idle_optimization': 'Remove Known'
 };
 
 var gm = null;
@@ -187,12 +196,12 @@ function updateTouch(e) {
   var px = Math.max(0, Math.min(240, e.clientX));
   var py = Math.max(0, Math.min(282, e.clientY));
   var nd = {};
-  // Visual LEFT side = physical bottom (py > 200)
-  if (py > 200 && px < 140) nd[4] = true;    // UP
-  if (py > 200 && px > 150) nd[5] = true;    // DOWN
-  // Visual RIGHT side = physical top (py < 80)
-  if (py < 80 && px < 140) nd[8] = true;     // A
-  if (py < 80 && px > 150) nd[0] = true;     // B
+  // Visual LEFT side = physical bottom (py > 210)
+  if (py > 210 && px < 80) nd[4] = true;    // UP — compact
+  if (py > 210 && px > 160) nd[5] = true;   // DOWN — compact
+  // Visual RIGHT side = physical top (py < 60)
+  if (py < 60 && px < 80) nd[8] = true;     // A — compact
+  if (py < 60 && px > 160) nd[0] = true;    // B — compact
   for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
   for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
   touchDirs = nd;
