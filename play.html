@@ -116,14 +116,14 @@
                 background: rgba(255, 255, 255, 0.25) !important;
             }
             #gp-up {
-                top: 242px;
-                left: 74px;
+                top: 226px;
+                right: 54px;
                 width: 36px;
                 height: 36px;
             }
             #gp-down {
                 top: 242px;
-                right: 74px;
+                right: 14px;
                 width: 36px;
                 height: 36px;
             }
@@ -162,6 +162,25 @@
         </div>
 
         <script>
+            // Override AudioContext to force a lower sample rate for performance optimization
+            (function () {
+                var OriginalAudioContext =
+                    window.AudioContext || window.webkitAudioContext;
+                if (OriginalAudioContext) {
+                    var NewAudioContext = function (options) {
+                        options = options || {};
+                        options.sampleRate = 32000; // Optimize for R1 (GBA native is ~32kHz)
+                        options.latencyHint = "interactive";
+                        var ctx = new OriginalAudioContext(options);
+                        OriginalAudioContext._inst = ctx;
+                        return ctx;
+                    };
+                    NewAudioContext.prototype = OriginalAudioContext.prototype;
+                    window.AudioContext = NewAudioContext;
+                    window.webkitAudioContext = NewAudioContext;
+                }
+            })();
+
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -206,7 +225,7 @@
             };
             EJS_defaultOptions = {
                 mgba_frameskip: "auto_threshold",
-                mgba_frameskip_threshold: "50",
+                mgba_frameskip_threshold: "57",
                 mgba_idle_optimization: "Detect and Remove",
             };
 
