@@ -12,23 +12,43 @@
 html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-select:none;user-select:none}
 #game{
   position:absolute;
-  inset:0;
+  width:282px!important;height:240px!important;
+  left:-21px;top:21px;
+  transform:rotate(-90deg);
+  transform-origin:center center;
   background:#000;
   overflow:hidden;
 }
 #game canvas,.ejs_canvas{width:100%!important;height:100%!important;image-rendering:pixelated}
 .ejs_parent canvas{width:100%!important;height:100%!important}
 #menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
-#game{touch-action:auto}
-/* Virtual gamepad — visible at low opacity, smaller, touch-capable */
-[class*="ejs_virtual"]{opacity:0.25!important}
-[class*="ejs_gamepad"]{opacity:0.25!important}
-.ejs_virtual_gamepad{transform:scale(0.6)!important;transform-origin:center bottom!important}
+[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+[class*="ejs_bottom"]{display:none!important}
+#gp{position:fixed;inset:0;z-index:10;pointer-events:none}
+.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:10px;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border-radius:4px}
+.gp-btn:active{background:rgba(255,255,255,0.15)!important}
+#gp-up{left:4px;bottom:112px;width:36px;height:36px}
+#gp-down{left:4px;bottom:50px;width:36px;height:36px}
+#gp-left{left:4px;bottom:76px;width:36px;height:28px}
+#gp-right{left:4px;bottom:76px;width:36px;height:28px;margin-left:40px}
+#gp-a{right:8px;bottom:78px;width:40px;height:40px;border-radius:50%}
+#gp-b{right:8px;bottom:30px;width:40px;height:40px;border-radius:50%}
 </style>
 </head>
 <body>
 <div id="game"></div>
 <div id="menu-trigger"></div>
+<div id="gp">
+  <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
+  <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
+  <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
+  <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
+  <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
+  <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+</div>
 
 <script>
 var romUrl = '';
@@ -45,8 +65,6 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_videoRotation = 3;
-EJS_controlScheme = 'gba';
 EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
@@ -75,7 +93,6 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
-  // Fix screen fill after emulator fully initializes
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
     if (!cvs) return;
@@ -98,8 +115,6 @@ EJS_onGameStart = function() {
     }
   }, 1500);
 };
-// Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
-// keyMap keyCodes: z=90, x=88, Enter=13, Shift=16, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
 
 function doInput(btn, keyCode, val) {
   if (gm) {
@@ -119,22 +134,27 @@ function tap(btn, kc, ms) {
   setTimeout(function(){ release(btn, kc); }, ms || 80);
 }
 
-// ─── R1 Controls ───
+document.querySelectorAll('.gp-btn').forEach(function(el) {
+  var btn = parseInt(el.dataset.btn);
+  var kc = parseInt(el.dataset.kc);
+  el.addEventListener('pointerdown', function(e) { e.preventDefault(); press(btn, kc); });
+  el.addEventListener('pointerup', function(e) { e.preventDefault(); release(btn, kc); });
+  el.addEventListener('pointerleave', function() { release(btn, kc); });
+  el.addEventListener('pointercancel', function() { release(btn, kc); });
+});
+
 var sideCount = 0, lastSide = 0, sideTimer = null, longHeld = false;
 var SUPER_LONG_MS = 4000, superLongTimer = null;
 
-// PTT: 1 press = A(btn8,kc90) immediate. Double press = B(btn0,kc88)
 window.addEventListener('sideClick', function(){
   if (longHeld) return;
   var now = Date.now();
   clearTimeout(sideTimer);
   if (now - lastSide < 250) {
-    // Double press: release A, fire B as quick tap
     release(8, 90);
     tap(0, 88, 80);
     sideCount = 0;
   } else {
-    // Single press: A immediately (no delay!)
     press(8, 90);
     sideCount = 1;
     sideTimer = setTimeout(function(){
@@ -144,7 +164,6 @@ window.addEventListener('sideClick', function(){
   lastSide = now;
 });
 
-// Long press = Start(3,kc13). Super long (2s) = back to menu
 window.addEventListener('longPressStart', function(){
   longHeld = true;
   press(3, 13);
@@ -158,7 +177,6 @@ window.addEventListener('longPressEnd', function(){
   release(3, 13);
 });
 
-// Scroll: hold direction while scrolling — release 200ms after last scroll
 var scrollTimer = null, scrollDir = null;
 window.addEventListener('scrollDown', function(){
   clearTimeout(scrollTimer);
@@ -171,16 +189,12 @@ window.addEventListener('scrollUp', function(){
   scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
 });
 
-// No custom touch zones — built-in GBA virtual gamepad handles touch input
-
-// Audio resume — emulator manages its own AudioContext
 function tryResumeCtx() {
   try { var ctx = window.AudioContext && (window.AudioContext._inst || new AudioContext()); if (ctx && ctx.state === 'suspended') ctx.resume(); } catch(e) {}
 }
 window.addEventListener('sideClick', tryResumeCtx);
 window.addEventListener('scrollUp', tryResumeCtx);
 
-// Prevent OS context menu in game zones — allowed in #menu-trigger zone (top-right)
 document.addEventListener('contextmenu', function(e) {
   var px = e.clientX, py = e.clientY;
   if (px > 60 || py > 60) e.preventDefault();
