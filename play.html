@@ -20,9 +20,10 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 .ejs_parent canvas{width:100%!important;height:100%!important}
 #menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
 #game{touch-action:auto}
-/* Virtual gamepad — visible at low opacity, touch-capable */
+/* Virtual gamepad — visible at low opacity, smaller, touch-capable */
 [class*="ejs_virtual"]{opacity:0.25!important}
 [class*="ejs_gamepad"]{opacity:0.25!important}
+.ejs_virtual_gamepad{transform:scale(0.6)!important;transform-origin:center bottom!important}
 </style>
 </head>
 <body>
@@ -44,7 +45,7 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_videoRotation = 1;
+EJS_videoRotation = 3;
 EJS_controlScheme = 'gba';
 EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
