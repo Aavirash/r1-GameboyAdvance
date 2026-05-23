@@ -27,29 +27,28 @@ html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-
 [class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
 [class*="ejs_bottom"]{display:none!important}
-#gp{position:absolute;inset:0;z-index:999999;pointer-events:none}
-.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:3px}
+#gp{position:fixed;inset:0;z-index:2147483647;pointer-events:none;will-change:transform;isolation:isolate}
+.gp-btn{position:absolute;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:4px;transform:rotate(-90deg)}
 .gp-btn:active{background:rgba(255,255,255,0.25)!important}
-#gp-up{left:62px;top:15px;width:32px;height:32px}
-#gp-down{left:38px;top:15px;width:32px;height:32px}
-#gp-left{left:50px;top:4px;width:32px;height:22px}
-#gp-right{left:50px;top:36px;width:32px;height:22px}
-#gp-a{left:62px;top:190px;width:34px;height:34px;border-radius:50%}
-#gp-b{left:38px;top:190px;width:34px;height:34px;border-radius:50%}
+#gp-up{top:140px;right:14px;width:40px;height:40px}
+#gp-down{top:220px;right:14px;width:40px;height:40px}
+#gp-left{top:178px;right:0;width:32px;height:40px}
+#gp-right{top:178px;right:54px;width:32px;height:40px}
+#gp-a{top:140px;left:14px;width:44px;height:44px;border-radius:50%}
+#gp-b{top:220px;left:14px;width:44px;height:44px;border-radius:50%}
 </style>
 </head>
 <body>
-<div id="game">
-  <div id="gp">
-    <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
-    <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
-    <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
-    <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
-    <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
-    <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
-  </div>
-</div>
+<div id="game"></div>
 <div id="menu-trigger"></div>
+<div id="gp">
+  <div id="gp-up" class="gp-btn" data-btn="4" data-kc="38">▲</div>
+  <div id="gp-down" class="gp-btn" data-btn="5" data-kc="40">▼</div>
+  <div id="gp-left" class="gp-btn" data-btn="6" data-kc="37">◀</div>
+  <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
+  <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
+  <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+</div>
 
 <script>
 var romUrl = '';
@@ -81,8 +80,7 @@ EJS_defaultOptions = {
   'mgba_idle_optimization': 'Detect and Remove'
 };
 
-var gm = null;
-var started = false;
+var gm = null, started = false;
 
 EJS_onGameStart = function() {
   var tryGet = setInterval(function() {
@@ -94,12 +92,6 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
-  // Re-parent gp to end of #game so it stacks above emulator elements
-  setTimeout(function() {
-    var gp = document.getElementById('gp');
-    var game = document.getElementById('game');
-    if (gp && game) game.appendChild(gp);
-  }, 100);
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
     if (!cvs) return;
@@ -206,6 +198,44 @@ document.addEventListener('contextmenu', function(e) {
   var px = e.clientX, py = e.clientY;
   if (px > 60 || py > 60) e.preventDefault();
 }, true);
+
+// Swipe-up from bottom to toggle emulator settings overlay
+var swipeY = null;
+document.addEventListener('pointerdown', function(e) {
+  if (e.clientY > 260) swipeY = e.clientY;
+});
+document.addEventListener('pointerup', function(e) {
+  if (swipeY !== null && e.clientY < swipeY - 30) {
+    var sb = document.querySelector('.ejs_settings_btn, [class*="settings"], [class*="Settings"]');
+    if (sb) sb.click();
+  }
+  swipeY = null;
+});
+
+// Force #gp to stay on top after emulator loads (canvas can cover it)
+(function keepGPVisible() {
+  var gp = document.getElementById('gp');
+  if (!gp) return;
+  var keep = setInterval(function() {
+    if (gp.parentNode !== document.body) {
+      document.body.appendChild(gp);
+    }
+    gp.style.display = 'flex';
+    gp.style.zIndex = '2147483647';
+    gp.style.transform = 'none';
+    // Re-append as last child every poll to stay above any dynamic elements
+    document.body.appendChild(gp);
+  }, 1000);
+  // Also fix on any DOM mutation
+  var obs = new MutationObserver(function() {
+    if (gp.parentNode !== document.body) {
+      document.body.appendChild(gp);
+    }
+  });
+  obs.observe(document.body, {childList: true, subtree: true});
+  // Stop interval after 30 seconds
+  setTimeout(function() { clearInterval(keep); obs.disconnect(); }, 30000);
+})();
 </script>
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
