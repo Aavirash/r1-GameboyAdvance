@@ -12,37 +12,22 @@
 html,body{width:240px;height:282px;overflow:hidden;background:#000;-webkit-user-select:none;user-select:none}
 #game{
   position:absolute;
-  width:282px!important;height:240px!important;
-  left:-21px;top:21px;
-  transform:rotate(-90deg);
-  transform-origin:center center;
+  inset:0;
   background:#000;
   overflow:hidden;
 }
 #game canvas,.ejs_canvas{width:100%!important;height:100%!important;image-rendering:pixelated}
 .ejs_parent canvas{width:100%!important;height:100%!important}
 #menu-trigger{position:fixed;left:0;top:0;width:60px;height:60px;z-index:9999;touch-action:auto;pointer-events:auto;background:transparent}
-#game{touch-action:none}
-.touch-label{position:fixed;width:72px;height:64px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.18);font-size:11px;font-weight:600;pointer-events:none;z-index:1;transform:rotate(-90deg)}
-#tl-up{left:4px;bottom:4px}
-#tl-down{right:4px;bottom:4px}
-#tl-a{left:4px;top:4px}
-#tl-b{right:4px;top:4px}
-/* Hide virtual gamepad and bottom bar */
-[class*="virtual"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="Gamepad"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="nipple"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
-[class*="ejs_bottom"]{display:none!important}
+#game{touch-action:auto}
+/* Virtual gamepad — visible at low opacity, touch-capable */
+[class*="ejs_virtual"]{opacity:0.25!important}
+[class*="ejs_gamepad"]{opacity:0.25!important}
 </style>
 </head>
 <body>
 <div id="game"></div>
 <div id="menu-trigger"></div>
-<div id="tl-up" class="touch-label">▲</div>
-<div id="tl-down" class="touch-label">▼</div>
-<div id="tl-a" class="touch-label">A</div>
-<div id="tl-b" class="touch-label">B</div>
 
 <script>
 var romUrl = '';
@@ -59,7 +44,8 @@ EJS_core = 'gba';
 EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
 EJS_gameUrl = romUrl;
 EJS_startOnLoaded = true;
-EJS_threads = true;
+EJS_videoRotation = 1;
+EJS_controlScheme = 'gba';
 EJS_volume = 0.08;
 EJS_backgroundColor = '#000';
 EJS_Buttons = {
@@ -69,7 +55,6 @@ EJS_Buttons = {
   loadSavFiles:false, quickSave:false, quickLoad:false, screenshot:false,
   cacheManager:false, exitEmulation:false
 };
-EJS_VirtualGamepadSettings = [];
 EJS_defaultOptions = {
   'mgba_frameskip': 'auto_threshold',
   'mgba_frameskip_threshold': '33',
@@ -89,9 +74,6 @@ EJS_onGameStart = function() {
       }
     } catch(e) {}
   }, 300);
-  // Single cleanup + observer for virtual gamepad hiding
-  hideVirtualUI();
-  new MutationObserver(hideVirtualUI).observe(document.body, { childList: true, subtree: true });
   // Fix screen fill after emulator fully initializes
   setTimeout(function() {
     var cvs = document.querySelector('#game canvas');
@@ -115,13 +97,6 @@ EJS_onGameStart = function() {
     }
   }, 1500);
 };
-function hideVirtualUI() {
-  document.querySelectorAll('[class*="virtual"],[class*="gamepad"],[class*="Gamepad"],[class*="nipple"]').forEach(function(el) {
-    el.style.display = 'none';
-    el.style.visibility = 'hidden';
-  });
-}
-
 // Button map: 0=B, 2=SELECT, 3=START, 4=UP, 5=DOWN, 6=LEFT, 7=RIGHT, 8=A
 // keyMap keyCodes: z=90, x=88, Enter=13, Shift=16, ArrowLeft=37, ArrowUp=38, ArrowRight=39, ArrowDown=40
 
@@ -195,32 +170,7 @@ window.addEventListener('scrollUp', function(){
   scrollTimer = setTimeout(function(){ if (scrollDir===6) { release(6,37); scrollDir=null; } }, 200);
 });
 
-// Touch controls
-var touchMap = {0:88, 4:38, 5:40, 6:37, 7:39, 8:90};
-var touchDirs = {}, touchActive = false;
-document.addEventListener('pointerdown', function(e){ touchActive = true; updateTouch(e); }, true);
-document.addEventListener('pointermove', function(e){ if(touchActive) updateTouch(e); }, true);
-document.addEventListener('pointerup',   function(){ touchActive = false; releaseTouch(); }, true);
-document.addEventListener('pointercancel',function(){ touchActive = false; releaseTouch(); }, true);
-
-function updateTouch(e) {
-  var px = Math.max(0, Math.min(240, e.clientX));
-  var py = Math.max(0, Math.min(282, e.clientY));
-  var nd = {};
-  // Visual LEFT side = physical bottom (py > 210)
-  if (py > 210 && px < 80) nd[4] = true;    // UP — compact
-  if (py > 210 && px > 160) nd[5] = true;   // DOWN — compact
-  // Visual RIGHT side = physical top (py < 60)
-  if (py < 60 && px < 140) nd[8] = true;    // A — close to B
-  if (py < 60 && px > 150) nd[0] = true;    // B — close to A
-  for (var k in nd)       { if (!touchDirs[k]) press(parseInt(k), touchMap[k]); }
-  for (var k in touchDirs) { if (!nd[k])       release(parseInt(k), touchMap[k]); }
-  touchDirs = nd;
-}
-function releaseTouch() {
-  for (var k in touchDirs) release(parseInt(k), touchMap[k]);
-  touchDirs = {};
-}
+// No custom touch zones — built-in GBA virtual gamepad handles touch input
 
 // Audio resume — emulator manages its own AudioContext
 function tryResumeCtx() {
