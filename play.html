@@ -38,12 +38,14 @@
                 transform-origin: center center;
                 background: #000;
                 overflow: hidden;
+                will-change: transform;
             }
             #game canvas,
             .ejs_canvas {
                 width: 100% !important;
                 height: 100% !important;
                 image-rendering: pixelated;
+                will-change: transform;
             }
             .ejs_parent canvas {
                 width: 100% !important;
@@ -115,13 +117,13 @@
             }
             #gp-up {
                 top: 242px;
-                left: 14px;
+                left: 74px;
                 width: 36px;
                 height: 36px;
             }
             #gp-down {
                 top: 242px;
-                right: 14px;
+                right: 74px;
                 width: 36px;
                 height: 36px;
             }
@@ -133,14 +135,14 @@
             }
             #gp-a {
                 top: 20px;
-                right: 14px;
+                right: 54px;
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
             }
             #gp-b {
                 top: 36px;
-                right: 54px;
+                right: 14px;
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
@@ -204,7 +206,7 @@
             };
             EJS_defaultOptions = {
                 mgba_frameskip: "auto_threshold",
-                mgba_frameskip_threshold: "33",
+                mgba_frameskip_threshold: "50",
                 mgba_idle_optimization: "Detect and Remove",
             };
 
@@ -410,19 +412,23 @@
                 true,
             );
 
-            // Swipe-up from bottom to toggle emulator settings overlay
-            var swipeY = null;
+            // Swipe-up from landscape bottom (portrait right) to toggle emulator settings
+            var swipeX = null;
             document.addEventListener("pointerdown", function (e) {
-                if (e.clientY > 260) swipeY = e.clientY;
+                if (e.clientX > 200) swipeX = e.clientX;
             });
             document.addEventListener("pointerup", function (e) {
-                if (swipeY !== null && e.clientY < swipeY - 30) {
+                if (swipeX !== null && e.clientX < swipeX - 30) {
                     var sb = document.querySelector(
                         '.ejs_settings_btn, [class*="settings"], [class*="Settings"]',
                     );
-                    if (sb) sb.click();
+                    if (sb) {
+                        try {
+                            sb.click();
+                        } catch (err) {}
+                    }
                 }
-                swipeY = null;
+                swipeX = null;
             });
 
             // Force #gp to stay on top after emulator loads (canvas can cover it)
