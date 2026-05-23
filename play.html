@@ -162,25 +162,6 @@
         </div>
 
         <script>
-            // Override AudioContext to force a lower sample rate for performance optimization
-            (function () {
-                var OriginalAudioContext =
-                    window.AudioContext || window.webkitAudioContext;
-                if (OriginalAudioContext) {
-                    var NewAudioContext = function (options) {
-                        options = options || {};
-                        options.sampleRate = 32000; // Optimize for R1 (GBA native is ~32kHz)
-                        options.latencyHint = "interactive";
-                        var ctx = new OriginalAudioContext(options);
-                        OriginalAudioContext._inst = ctx;
-                        return ctx;
-                    };
-                    NewAudioContext.prototype = OriginalAudioContext.prototype;
-                    window.AudioContext = NewAudioContext;
-                    window.webkitAudioContext = NewAudioContext;
-                }
-            })();
-
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -225,8 +206,10 @@
             };
             EJS_defaultOptions = {
                 mgba_frameskip: "auto_threshold",
-                mgba_frameskip_threshold: "57",
+                mgba_frameskip_threshold: "33",
                 mgba_idle_optimization: "Detect and Remove",
+                mgba_audio_buffers: 2048,
+                mgba_audio_sync: false,
             };
 
             var gm = null,
