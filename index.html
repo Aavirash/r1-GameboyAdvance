@@ -126,10 +126,13 @@ function renderMenu() {
   for (var i=0;i<items.length;i++){
     items[i].classList.toggle('selected', i===menuIndex);
   }
-  var itemH = items.length > 0 ? items[0].offsetHeight : 28;
-  var viewH = document.getElementById('menu-list-wrap').clientHeight;
-  var maxScroll = Math.max(0, items.length * itemH - viewH);
-  var target = Math.max(0, Math.min(maxScroll, menuIndex * itemH));
+  if (items.length === 0) return;
+  var wrap = document.getElementById('menu-list-wrap');
+  var viewH = wrap.clientHeight;
+  var lastItem = items[items.length-1];
+  var totalH = lastItem.offsetTop + lastItem.offsetHeight;
+  var maxScroll = Math.max(0, totalH - viewH);
+  var target = Math.max(0, Math.min(maxScroll, items[menuIndex].offsetTop));
   $menuList.style.transform = 'translateY(-'+target+'px)';
 }
 
