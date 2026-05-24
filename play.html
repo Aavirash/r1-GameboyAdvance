@@ -218,13 +218,14 @@
                 exitEmulation: false,
             };
             EJS_defaultOptions = {
-                mgba_frameskip: 0,
+                mgba_frameskip: 7,
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
                 { name: "audio_latency", default: "256", isString: false },
                 { name: "video_threaded", default: "true" },
+                { name: "video_vsync", default: "false", isString: false },
             ];
 
             var gm = null,
