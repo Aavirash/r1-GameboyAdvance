@@ -218,7 +218,7 @@
                 exitEmulation: false,
             };
             EJS_defaultOptions = {
-                mgba_frameskip: 7,
+                mgba_frameskip: 0,
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
@@ -438,7 +438,7 @@
                     gp.style.transform = "none";
                     // Re-append as last child every poll to stay above any dynamic elements
                     document.body.appendChild(gp);
-                }, 1000);
+                }, 2000);
                 // Also fix on any DOM mutation
                 var obs = new MutationObserver(function () {
                     if (gp.parentNode !== document.body) {
@@ -446,7 +446,7 @@
                     }
                 });
                 obs.observe(document.body, { childList: true, subtree: true });
-                // Stop interval after 30 seconds
+                // Stop interval after 15 seconds
                 setTimeout(function () {
                     clearInterval(keep);
                     obs.disconnect();
@@ -466,7 +466,7 @@
                 }
             });
             killSettings.observe(document.body, { childList: true, subtree: true, attributes: true });
-            setTimeout(function () { killSettings.disconnect(); }, 15000);
+            setTimeout(function () { killSettings.disconnect(); }, 5000);
         </script>
         <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
     </body>
