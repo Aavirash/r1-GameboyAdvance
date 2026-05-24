@@ -184,6 +184,7 @@
             EJS_startOnLoaded = true;
             EJS_volume = 0.08;
             EJS_backgroundColor = "#000";
+            EJS_forceLegacyCores = true;
             EJS_Buttons = {
                 playPause: false,
                 restart: false,
@@ -207,7 +208,20 @@
             EJS_defaultOptions = {
                 mgba_frameskip: 3,
                 mgba_frameskip_threshold: "33",
+                'vsync': 'disabled',
+                'webgl2Enabled': 'disabled',
             };
+            EJS_retroarchOpts = [
+                { name: "audio_out_rate", default: "44100", isString: false },
+                { name: "audio_latency", default: "256", isString: false },
+                { name: "audio_sync", default: "true" },
+                { name: "audio_rate_control", default: "true" },
+                { name: "audio_rate_control_delta", default: "0.010" },
+                { name: "audio_max_timing_skew", default: "0.10" },
+                { name: "audio_resampler", default: "nearest" },
+                { name: "audio_resampler_quality", default: "0", isString: false },
+                { name: "video_vsync", default: "false" },
+            ];
 
             var gm = null,
                 started = false;
