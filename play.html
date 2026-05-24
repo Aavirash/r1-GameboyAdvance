@@ -468,6 +468,29 @@
                     obs.disconnect();
                 }, 30000);
             })();
+
+            // Nuke settings popups when EJS creates them
+            var killSettings = new MutationObserver(function () {
+                var els = document.querySelectorAll(
+                    '.ejs_settings_btn, .ejs_settings_popup, [class*="settings"], [class*="popup"]'
+                );
+                for (var i = 0; i < els.length; i++) {
+                    if (els[i].offsetParent !== null || els[i].classList.contains('ejs_settings_btn')) {
+                        els[i].style.setProperty('display', 'none', 'important');
+                        els[i].style.setProperty('visibility', 'hidden', 'important');
+                        els[i].style.setProperty('opacity', '0', 'important');
+                        els[i].style.setProperty('pointer-events', 'none', 'important');
+                    }
+                }
+            });
+            killSettings.observe(document.body, { childList: true, subtree: true, attributes: true });
+            setTimeout(function () { killSettings.disconnect(); }, 15000);
+
+            // Keep CPU busy to prevent governor from downclocking
+            var busyTimer = setInterval(function () {
+                for (var i = 0; i < 500; i++) { Math.sqrt(i); }
+            }, 16);
+            setTimeout(function () { clearInterval(busyTimer); }, 300000);
         </script>
         <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
     </body>
