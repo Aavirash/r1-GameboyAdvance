@@ -162,6 +162,18 @@
         </div>
 
         <script>
+            // --- AudioContext patch: force 44100 sample rate ---
+            (function(){
+                var AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                window.AudioContext = function(opts) {
+                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100 })); }
+                    catch(e) { return new AC(opts); }
+                };
+                window.AudioContext.prototype = AC.prototype;
+                window.webkitAudioContext = window.AudioContext;
+            })();
+
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -208,10 +220,6 @@
                 mgba_frameskip: 3,
                 mgba_frameskip_threshold: "33",
             };
-            EJS_retroarchOpts = [
-                { name: "audio_latency", default: "128", isString: false },
-                { name: "audio_out_rate", default: "44100", isString: false },
-            ];
 
             var gm = null,
                 started = false;
