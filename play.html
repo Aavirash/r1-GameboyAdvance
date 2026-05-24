@@ -152,26 +152,6 @@
                 width: 36px;
                 height: 36px;
             }
-            .ejs_settings_btn {
-                position: fixed !important;
-                left: 50% !important;
-                top: 2px !important;
-                transform: translateX(-50%) !important;
-                z-index: 99999 !important;
-            }
-            .ejs_settings_popup {
-                position: fixed !important;
-                top: 40px !important;
-                left: 50% !important;
-                transform: translateX(-50%) !important;
-                z-index: 99999 !important;
-                max-height: calc(100vh - 50px) !important;
-                overflow-y: auto !important;
-            }
-            .ejs_settings_body {
-                max-height: calc(100vh - 80px) !important;
-                overflow-y: auto !important;
-            }
         </style>
     </head>
     <body>
@@ -225,7 +205,7 @@
                 playPause: false,
                 restart: false,
                 mute: false,
-                settings: true,
+                settings: false,
                 fullscreen: false,
                 saveState: false,
                 loadState: false,
@@ -453,25 +433,6 @@
                 },
                 true,
             );
-
-            // Swipe-up from landscape bottom (portrait right) to toggle emulator settings
-            var swipeX = null;
-            document.addEventListener("pointerdown", function (e) {
-                if (e.clientX > 200) swipeX = e.clientX;
-            });
-            document.addEventListener("pointerup", function (e) {
-                if (swipeX !== null && e.clientX < swipeX - 30) {
-                    var sb = document.querySelector(
-                        '.ejs_settings_btn, [class*="settings"], [class*="Settings"]',
-                    );
-                    if (sb) {
-                        try {
-                            sb.click();
-                        } catch (err) {}
-                    }
-                }
-                swipeX = null;
-            });
 
             // Force #gp to stay on top after emulator loads (canvas can cover it)
             (function keepGPVisible() {
