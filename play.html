@@ -147,7 +147,7 @@
                 height: 36px;
             }
             #gp-b {
-                top: 18px;
+                top: 14px;
                 right: 14px;
                 width: 36px;
                 height: 36px;
@@ -167,14 +167,14 @@
         </div>
 
         <script>
-            // --- AudioContext patch: force 44100 + playback latency ---
+            // --- AudioContext: pre-create singleton with optimal settings ---
             (function(){
                 var AC = window.AudioContext || window.webkitAudioContext;
                 if (!AC) return;
-                window.AudioContext = function(opts) {
-                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100, latencyHint: 'playback' })); }
-                    catch(e) { return new AC(opts); }
-                };
+                var ctx;
+                try { ctx = new AC({ sampleRate: 44100, latencyHint: 'playback' }); }
+                catch(e) { ctx = new AC(); }
+                window.AudioContext = function() { return ctx; };
                 window.AudioContext.prototype = AC.prototype;
                 window.webkitAudioContext = window.AudioContext;
             })();
@@ -228,8 +228,8 @@
             };
             EJS_retroarchOpts = [
                 { name: "video_vsync", default: "false", isString: false },
-                { name: "audio_rate_control", default: "false" },
-                { name: "audio_latency", default: "256", isString: false },
+                { name: "audio_rate_control", default: "true" },
+                { name: "audio_rate_control_delta", default: "0.050" },
             ];
 
             var gm = null,
