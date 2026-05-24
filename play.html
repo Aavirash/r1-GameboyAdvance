@@ -141,13 +141,13 @@
                 display: none !important;
             }
             #gp-a {
-                top: 28px;
+                top: 34px;
                 right: 54px;
                 width: 36px;
                 height: 36px;
             }
             #gp-b {
-                top: 26px;
+                top: 24px;
                 right: 14px;
                 width: 36px;
                 height: 36px;
@@ -226,6 +226,9 @@
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
+            EJS_retroarchOpts = [
+                { name: "video_vsync", default: "false", isString: false },
+            ];
 
             var gm = null,
                 started = false;
