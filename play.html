@@ -167,16 +167,24 @@
         </div>
 
         <script>
-            // --- AudioContext: force 44100 + playback latency ---
+            // --- AudioContext: force 44100 + playback latency + larger buffer ---
             (function(){
                 var AC = window.AudioContext || window.webkitAudioContext;
                 if (!AC) return;
+                // Force 44100 + playback mode
                 window.AudioContext = function(opts) {
                     try { return new AC(Object.assign({}, opts, { sampleRate: 44100, latencyHint: 'playback' })); }
                     catch(e) { return new AC(opts); }
                 };
                 window.AudioContext.prototype = AC.prototype;
                 window.webkitAudioContext = window.AudioContext;
+                // Double the ScriptProcessorNode buffer to prevent underruns
+                if (AC.prototype.createScriptProcessor) {
+                    var orig = AC.prototype.createScriptProcessor;
+                    AC.prototype.createScriptProcessor = function(buf, inCh, outCh) {
+                        return orig.call(this, 4096, inCh, outCh);
+                    };
+                }
             })();
 
             var romUrl = "";
