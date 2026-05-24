@@ -195,7 +195,7 @@
             EJS_gameUrl = romUrl;
             EJS_startOnLoaded = true;
             EJS_hideSettings = true;
-            EJS_volume = 0.08;
+            EJS_volume = 0.5;
             EJS_backgroundColor = "#000";
             EJS_Buttons = {
                 playPause: false,
@@ -222,6 +222,10 @@
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
+            EJS_retroarchOpts = [
+                { name: "audio_latency", default: "256", isString: false },
+                { name: "video_threaded", default: "true" },
+            ];
 
             var gm = null,
                 started = false;
@@ -425,33 +429,11 @@
                 true,
             );
 
-            // Force #gp to stay on top after emulator loads (canvas can cover it)
-            (function keepGPVisible() {
-                var gp = document.getElementById("gp");
-                if (!gp) return;
-                var keep = setInterval(function () {
-                    if (gp.parentNode !== document.body) {
-                        document.body.appendChild(gp);
-                    }
-                    gp.style.display = "flex";
-                    gp.style.zIndex = "2147483647";
-                    gp.style.transform = "none";
-                    // Re-append as last child every poll to stay above any dynamic elements
-                    document.body.appendChild(gp);
-                }, 2000);
-                // Also fix on any DOM mutation
-                var obs = new MutationObserver(function () {
-                    if (gp.parentNode !== document.body) {
-                        document.body.appendChild(gp);
-                    }
-                });
-                obs.observe(document.body, { childList: true, subtree: true });
-                // Stop interval after 15 seconds
-                setTimeout(function () {
-                    clearInterval(keep);
-                    obs.disconnect();
-                }, 30000);
-            })();
+            // Set #gp z-index once after load
+            var gp = document.getElementById("gp");
+            if (gp) {
+                gp.style.zIndex = "2147483647";
+            }
 
             // Nuke settings popups and menu bar when EJS creates them
             var killSettings = new MutationObserver(function () {
