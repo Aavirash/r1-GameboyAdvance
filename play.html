@@ -141,13 +141,13 @@
                 display: none !important;
             }
             #gp-a {
-                top: 34px;
+                top: 24px;
                 right: 54px;
                 width: 36px;
                 height: 36px;
             }
             #gp-b {
-                top: 24px;
+                top: 20px;
                 right: 14px;
                 width: 36px;
                 height: 36px;
@@ -167,12 +167,12 @@
         </div>
 
         <script>
-            // --- AudioContext patch: force 44100 sample rate ---
+            // --- AudioContext patch: force 44100 + playback latency ---
             (function(){
                 var AC = window.AudioContext || window.webkitAudioContext;
                 if (!AC) return;
                 window.AudioContext = function(opts) {
-                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100 })); }
+                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100, latencyHint: 'playback' })); }
                     catch(e) { return new AC(opts); }
                 };
                 window.AudioContext.prototype = AC.prototype;
