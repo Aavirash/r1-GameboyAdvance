@@ -89,6 +89,12 @@
             [class*="ejs_bottom"] {
                 display: none !important;
             }
+            [class*="settings"] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
             #gp {
                 position: fixed;
                 inset: 0;
@@ -229,7 +235,7 @@
             EJS_retroarchOpts = [
                 { name: "video_vsync", default: "false", isString: false },
                 { name: "audio_rate_control", default: "false" },
-                { name: "audio_latency", default: "512", isString: false },
+                { name: "audio_latency", default: "1024", isString: false },
                 { name: "audio_sync", default: "false" },
             ];
 
