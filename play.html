@@ -167,23 +167,16 @@
         </div>
 
         <script>
-            // --- AudioContext: max buffer (16384 samples = 371ms) to absorb CPU freq switching ---
+            // --- AudioContext: 32000Hz (closer to GBA 32768, lighter CPU) + clean buffering ---
             (function(){
                 var AC = window.AudioContext || window.webkitAudioContext;
                 if (!AC) return;
                 window.AudioContext = function(opts) {
-                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100, latencyHint: 'playback' })); }
+                    try { return new AC(Object.assign({}, opts, { sampleRate: 32000, latencyHint: 'playback' })); }
                     catch(e) { return new AC(opts); }
                 };
                 window.AudioContext.prototype = AC.prototype;
                 window.webkitAudioContext = window.AudioContext;
-                // Max buffer (16384) to survive CPU frequency switch delays
-                if (AC.prototype.createScriptProcessor) {
-                    var orig = AC.prototype.createScriptProcessor;
-                    AC.prototype.createScriptProcessor = function(buf, inCh, outCh) {
-                        return orig.call(this, 16384, inCh, outCh);
-                    };
-                }
             })();
 
             var romUrl = "";
@@ -235,6 +228,8 @@
             };
             EJS_retroarchOpts = [
                 { name: "video_vsync", default: "false", isString: false },
+                { name: "audio_rate_control", default: "false" },
+                { name: "audio_latency", default: "256", isString: false },
             ];
 
             var gm = null,
