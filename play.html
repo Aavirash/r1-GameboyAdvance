@@ -89,7 +89,7 @@
             [class*="ejs_bottom"] {
                 display: none !important;
             }
-            [class*="settings"] {
+            .ejs_menu_bar, .ejs_settings_parent, .ejs_settings_btn {
                 display: none !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
@@ -174,17 +174,6 @@
 
         <script>
             // --- AudioContext: 44100Hz + playback hint, rate_control=off + 256ms buffer ---
-            (function(){
-                var AC = window.AudioContext || window.webkitAudioContext;
-                if (!AC) return;
-                window.AudioContext = function(opts) {
-                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100, latencyHint: 'playback' })); }
-                    catch(e) { return new AC(opts); }
-                };
-                window.AudioContext.prototype = AC.prototype;
-                window.webkitAudioContext = window.AudioContext;
-            })();
-
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -205,6 +194,7 @@
             EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
             EJS_gameUrl = romUrl;
             EJS_startOnLoaded = true;
+            EJS_hideSettings = true;
             EJS_volume = 0.08;
             EJS_backgroundColor = "#000";
             EJS_Buttons = {
@@ -469,28 +459,20 @@
                 }, 30000);
             })();
 
-            // Nuke settings popups when EJS creates them
+            // Nuke settings popups and menu bar when EJS creates them
             var killSettings = new MutationObserver(function () {
                 var els = document.querySelectorAll(
-                    '.ejs_settings_btn, .ejs_settings_popup, [class*="settings"], [class*="popup"]'
+                    '.ejs_menu_bar, .ejs_settings_parent, .ejs_settings_btn, [class*="settings"]'
                 );
                 for (var i = 0; i < els.length; i++) {
-                    if (els[i].offsetParent !== null || els[i].classList.contains('ejs_settings_btn')) {
-                        els[i].style.setProperty('display', 'none', 'important');
-                        els[i].style.setProperty('visibility', 'hidden', 'important');
-                        els[i].style.setProperty('opacity', '0', 'important');
-                        els[i].style.setProperty('pointer-events', 'none', 'important');
-                    }
+                    els[i].style.setProperty('display', 'none', 'important');
+                    els[i].style.setProperty('visibility', 'hidden', 'important');
+                    els[i].style.setProperty('opacity', '0', 'important');
+                    els[i].style.setProperty('pointer-events', 'none', 'important');
                 }
             });
             killSettings.observe(document.body, { childList: true, subtree: true, attributes: true });
             setTimeout(function () { killSettings.disconnect(); }, 15000);
-
-            // Keep CPU busy to prevent governor from downclocking
-            var busyTimer = setInterval(function () {
-                for (var i = 0; i < 500; i++) { Math.sqrt(i); }
-            }, 16);
-            setTimeout(function () { clearInterval(busyTimer); }, 300000);
         </script>
         <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
     </body>
