@@ -191,7 +191,7 @@
 
             EJS_player = "#game";
             EJS_core = "gba";
-            EJS_pathtodata = "https://cdn.emulatorjs.org/nightly/data/";
+            EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
             EJS_gameUrl = romUrl;
             EJS_startOnLoaded = true;
             EJS_hideSettings = true;
@@ -222,12 +222,6 @@
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
-            EJS_retroarchOpts = [
-                { name: "video_vsync", default: "false", isString: false },
-                { name: "audio_rate_control", default: "false" },
-                { name: "audio_latency", default: "1024", isString: false },
-                { name: "audio_sync", default: "false" },
-            ];
 
             var gm = null,
                 started = false;
