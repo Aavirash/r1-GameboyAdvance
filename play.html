@@ -134,14 +134,14 @@
                 display: none !important;
             }
             #gp-a {
-                top: 16px;
+                top: 24px;
                 right: 54px;
                 width: 36px;
                 height: 36px;
                 border-radius: 50%;
             }
             #gp-b {
-                top: 40px;
+                top: 30px;
                 right: 14px;
                 width: 36px;
                 height: 36px;
@@ -162,18 +162,6 @@
         </div>
 
         <script>
-            // --- AudioContext patch: force 44100 sample rate ---
-            (function(){
-                var AC = window.AudioContext || window.webkitAudioContext;
-                if (!AC) return;
-                window.AudioContext = function(opts) {
-                    try { return new AC(Object.assign({}, opts, { sampleRate: 44100 })); }
-                    catch(e) { return new AC(opts); }
-                };
-                window.AudioContext.prototype = AC.prototype;
-                window.webkitAudioContext = window.AudioContext;
-            })();
-
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -191,7 +179,7 @@
 
             EJS_player = "#game";
             EJS_core = "gba";
-            EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+            EJS_pathtodata = "https://cdn.emulatorjs.org/nightly/data/";
             EJS_gameUrl = romUrl;
             EJS_startOnLoaded = true;
             EJS_volume = 0.08;
