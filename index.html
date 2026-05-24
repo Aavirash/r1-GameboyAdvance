@@ -111,9 +111,9 @@ function buildMenu() {
   var html = '';
   for (var i=0;i<GAMES.length;i++) {
     var g = GAMES[i];
-    var src = g.thumb ? THUMB_BASE + encodeURIComponent(g.thumb) : '';
+    var src = g.thumb ? THUMB_BASE + g.thumb : '';
     html += '<div class="menu-item" data-idx="'+i+'">';
-    if (src) html += '<img src="'+src+'" loading="lazy" onerror="this.style.display=\'none\'">';
+    if (src) html += '<img src="'+src+'" onerror="this.style.display=\'none\'">';
     html += '<span>'+g.name+'</span></div>';
   }
   $menuList.innerHTML = html;
