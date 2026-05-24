@@ -24,8 +24,10 @@ body{
   padding:8px 10px 6px;
   border-bottom:1px solid rgba(254,80,0,0.18);
   font-size:11px;font-weight:700;letter-spacing:2px;
-  color:#FE5000;text-align:center;flex-shrink:0;
+  color:#FE5000;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:6px;
 }
+#menu-header img{width:20px;height:20px;object-fit:contain;flex-shrink:0}
 #menu-list-wrap{flex:1;overflow:hidden;position:relative}
 #menu-list{position:absolute;top:0;left:0;right:0;transition:transform .15s ease}
 .menu-item{
@@ -59,7 +61,7 @@ body{
 <div id="loading"><div id="loading-text">R1GBA</div></div>
 
 <div id="menu-screen">
-  <div id="menu-header">SELECT GAME</div>
+  <div id="menu-header"><img src="https://upload.wikimedia.org/wikipedia/commons/e/e2/VisualBoyAdvance.png" onerror="this.style.display='none'">R1 GAMEBOY ADVANCE</div>
   <div id="menu-list-wrap"><div id="menu-list"></div></div>
   <div id="menu-footer">SCROLL choose · SIDE CLICK select</div>
 </div>
