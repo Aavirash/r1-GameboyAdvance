@@ -30,10 +30,10 @@
             }
             #game {
                 position: absolute;
-                width: 300px !important;
-                height: 260px !important;
-                left: -30px;
-                top: 11px;
+                width: 320px !important;
+                height: 280px !important;
+                left: -40px;
+                top: 1px;
                 transform: rotate(-90deg);
                 transform-origin: center center;
                 background: #000;
@@ -151,6 +151,26 @@
                 right: 14px;
                 width: 36px;
                 height: 36px;
+            }
+            .ejs_settings_btn {
+                position: fixed !important;
+                left: 50% !important;
+                top: 2px !important;
+                transform: translateX(-50%) !important;
+                z-index: 99999 !important;
+            }
+            .ejs_settings_popup {
+                position: fixed !important;
+                top: 40px !important;
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+                z-index: 99999 !important;
+                max-height: calc(100vh - 50px) !important;
+                overflow-y: auto !important;
+            }
+            .ejs_settings_body {
+                max-height: calc(100vh - 80px) !important;
+                overflow-y: auto !important;
             }
         </style>
     </head>
