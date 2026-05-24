@@ -31,7 +31,13 @@ body{
 .menu-item{
   padding:8px 12px;font-size:11px;color:rgba(255,255,255,0.55);
   border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;
+  display:flex;align-items:center;gap:8px;
 }
+.menu-item img{
+  width:20px;height:20px;object-fit:cover;border-radius:2px;
+  flex-shrink:0;background:rgba(255,255,255,0.05);
+}
+.menu-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-item.selected{
   color:#fff;background:rgba(254,80,0,0.12);
   border-left:2px solid #FE5000;
@@ -59,39 +65,40 @@ body{
 </div>
 
 <script>
+var THUMB_BASE = 'https://thumbnails.libretro.com/Nintendo%20-%20Game%20Boy%20Advance/Named_Boxarts/';
 var GAMES = [
-  {id:'pokemonruby',      name:'Pokemon Ruby'},
-  {id:'pokemonsapphire',  name:'Pokemon Sapphire'},
-  {id:'pokemonemerald',   name:'Pokemon Emerald'},
-  {id:'pokemonred',       name:'Pokemon FireRed'},
-  {id:'pokemongreen',     name:'Pokemon LeafGreen'},
-  {id:'mysteryred',       name:'Pokemon Mystery Dungeon'},
-  {id:'zelda_minish',     name:'Zelda: Minish Cap'},
-  {id:'zelda_past',       name:'Zelda: Link to the Past'},
-  {id:'mariokart',        name:'Mario Kart Super Circuit'},
-  {id:'supermarioadvance', name:'Super Mario Advance'},
-  {id:'supermarioadvance2',name:'Super Mario Advance 2'},
-  {id:'supermarioadvance3',name:'Super Mario Advance 3'},
-  {id:'metroid_fusion',   name:'Metroid Fusion'},
-  {id:'metroid_zeromission',name:'Metroid Zero Mission'},
-  {id:'goldensun',        name:'Golden Sun'},
-  {id:'ff1and2',          name:'Final Fantasy I & II'},
-  {id:'ff6',              name:'Final Fantasy VI Advance'},
-  {id:'final_fantasy_tactics',name:'Final Fantasy Tactics'},
-  {id:'fire_emblem',      name:'Fire Emblem'},
-  {id:'warioland4',       name:'Wario Land 4'},
-  {id:'sonic_advance',    name:'Sonic Advance'},
-  {id:'advancewars',      name:'Advance Wars'},
-  {id:'advancewars2',     name:'Advance Wars 2'},
-  {id:'drilldozer',       name:'Drill Dozer'},
-  {id:'fzero_gp',         name:'F-Zero GP Legend'},
-  {id:'kirbynightmare',   name:'Kirby Nightmare'},
-  {id:'kirbymirror',      name:'Kirby Amazing Mirror'},
-  {id:'megaman_zero1',    name:'Megaman Zero'},
-  {id:'metalslug',        name:'Metal Slug Advance'},
-  {id:'tetris_worlds',    name:'Tetris Worlds'},
-  {id:'marioparty',      name:'Mario Party Advance'},
-  {id:'fzero_max',        name:'F-Zero Max Velocity'}
+  {id:'pokemonruby',      name:'Pokemon Ruby',                        thumb:'Pokemon - Ruby Version (USA).png'},
+  {id:'pokemonsapphire',  name:'Pokemon Sapphire',                   thumb:'Pokemon - Sapphire Version (USA).png'},
+  {id:'pokemonemerald',   name:'Pokemon Emerald',                    thumb:'Pokemon - Emerald Version (USA, Europe).png'},
+  {id:'pokemonred',       name:'Pokemon FireRed',                    thumb:'Pokemon - FireRed Version (USA).png'},
+  {id:'pokemongreen',     name:'Pokemon LeafGreen',                  thumb:'Pokemon - LeafGreen Version (USA).png'},
+  {id:'mysteryred',       name:'Pokemon Mystery Dungeon',            thumb:'Pokemon Mystery Dungeon - Red Rescue Team (USA, Australia).png'},
+  {id:'zelda_minish',     name:'Zelda: Minish Cap',                  thumb:'Legend of Zelda, The - The Minish Cap (USA).png'},
+  {id:'zelda_past',       name:'Zelda: Link to the Past',            thumb:'Legend of Zelda, The - A Link to the Past _ Four Swords (USA).png'},
+  {id:'mariokart',        name:'Mario Kart Super Circuit',           thumb:'Mario Kart - Super Circuit (USA).png'},
+  {id:'supermarioadvance', name:'Super Mario Advance',               thumb:'Super Mario Advance (USA, Europe).png'},
+  {id:'supermarioadvance2',name:'Super Mario Advance 2',             thumb:'Super Mario Advance 2 - Super Mario World (USA, Australia).png'},
+  {id:'supermarioadvance3',name:'Super Mario Advance 3',             thumb:'Super Mario Advance 3 - Yoshi\'s Island (USA).png'},
+  {id:'metroid_fusion',   name:'Metroid Fusion',                     thumb:'Metroid Fusion (USA).png'},
+  {id:'metroid_zeromission',name:'Metroid Zero Mission',             thumb:'Metroid - Zero Mission (USA).png'},
+  {id:'goldensun',        name:'Golden Sun',                          thumb:'Golden Sun (USA, Europe).png'},
+  {id:'ff1and2',          name:'Final Fantasy I & II',                thumb:'Final Fantasy I _ II - Dawn of Souls (USA).png'},
+  {id:'ff6',              name:'Final Fantasy VI Advance',            thumb:'Final Fantasy VI Advance (USA).png'},
+  {id:'final_fantasy_tactics',name:'Final Fantasy Tactics',           thumb:'Final Fantasy Tactics Advance (USA).png'},
+  {id:'fire_emblem',      name:'Fire Emblem',                         thumb:'Fire Emblem (USA, Australia).png'},
+  {id:'warioland4',       name:'Wario Land 4',                        thumb:'Wario Land 4 (USA, Europe).png'},
+  {id:'sonic_advance',    name:'Sonic Advance',                       thumb:'Sonic Advance (USA) (En,Ja).png'},
+  {id:'advancewars',      name:'Advance Wars',                        thumb:'Advance Wars (USA).png'},
+  {id:'advancewars2',     name:'Advance Wars 2',                      thumb:'Advance Wars 2 - Black Hole Rising (USA).png'},
+  {id:'drilldozer',       name:'Drill Dozer',                         thumb:'Drill Dozer (USA).png'},
+  {id:'fzero_gp',         name:'F-Zero GP Legend',                    thumb:'F-Zero - GP Legend (USA).png'},
+  {id:'kirbynightmare',   name:'Kirby Nightmare',                     thumb:'Kirby - Nightmare in Dream Land (USA).png'},
+  {id:'kirbymirror',      name:'Kirby Amazing Mirror',                thumb:'Kirby _ The Amazing Mirror (USA).png'},
+  {id:'megaman_zero1',    name:'Megaman Zero',                        thumb:'Megaman Zero (USA, Europe).png'},
+  {id:'metalslug',        name:'Metal Slug Advance',                  thumb:'Metal Slug Advance (USA).png'},
+  {id:'tetris_worlds',    name:'Tetris Worlds',                       thumb:'Tetris Worlds (USA).png'},
+  {id:'marioparty',      name:'Mario Party Advance',                  thumb:'Mario Party Advance (USA).png'},
+  {id:'fzero_max',        name:'F-Zero Max Velocity',                 thumb:'F-Zero - Maximum Velocity (USA, Europe).png'}
 ];
 
 var ROM_BASE = 'https://gba.js.org/binaries/';
@@ -103,7 +110,11 @@ var menuIndex = 0;
 function buildMenu() {
   var html = '';
   for (var i=0;i<GAMES.length;i++) {
-    html += '<div class="menu-item" data-idx="'+i+'">'+GAMES[i].name+'</div>';
+    var g = GAMES[i];
+    var src = g.thumb ? THUMB_BASE + encodeURIComponent(g.thumb) : '';
+    html += '<div class="menu-item" data-idx="'+i+'">';
+    if (src) html += '<img src="'+src+'" loading="lazy" onerror="this.style.display=\'none\'">';
+    html += '<span>'+g.name+'</span></div>';
   }
   $menuList.innerHTML = html;
   var items = $menuList.querySelectorAll('.menu-item');
