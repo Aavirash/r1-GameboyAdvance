@@ -246,6 +246,14 @@
                             gm = window.EJS_emulator.gameManager;
                             started = true;
                             clearInterval(tryGet);
+                            // Auto-save every 30s + on unload
+                            var saveInt = setInterval(function() {
+                                try { gm.saveSaveFiles(); } catch(e) {}
+                            }, 30000);
+                            window.addEventListener("beforeunload", function() {
+                                clearInterval(saveInt);
+                                try { gm.saveSaveFiles(); } catch(e) {}
+                            });
                         }
                     } catch (e) {}
                 }, 300);
@@ -271,27 +279,6 @@
                     }
                 }, 1500);
             };
-
-            // Auto-save battery saves periodically and on unload
-            EJS_emulator.on("start", function() {
-                setTimeout(function() {
-                    var trySave = setInterval(function() {
-                        try {
-                            if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-                                window.EJS_emulator.gameManager.saveSaveFiles();
-                            }
-                        } catch(e) {}
-                    }, 30000);
-                    window.addEventListener("beforeunload", function() {
-                        clearInterval(trySave);
-                        try {
-                            if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-                                window.EJS_emulator.gameManager.saveSaveFiles();
-                            }
-                        } catch(e) {}
-                    });
-                }, 5000);
-            });
 
             function doInput(btn, keyCode, val) {
                 if (gm) {
