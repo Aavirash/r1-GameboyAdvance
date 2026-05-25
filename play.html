@@ -255,6 +255,10 @@
                         arr[i] = bin.charCodeAt(i);
                     }
                     FS.writeFile("/data/saves/" + path, arr);
+                    try {
+                        var gm2 = window.EJS_emulator && window.EJS_emulator.gameManager;
+                        if (gm2 && gm2.loadSaveFiles) gm2.loadSaveFiles();
+                    } catch(e) {}
                 } catch(e) {}
             }
 
@@ -413,28 +417,39 @@
                 release(3, 13);
             });
 
+            function storeSave(name, data) {
+                if (!data) return;
+                var arr = new Uint8Array(data);
+                var bin = '';
+                for (var i = 0; i < arr.length; i++) {
+                    bin += String.fromCharCode(arr[i]);
+                }
+                localStorage.setItem('_r1s_' + EJS_gameName + '_path', name);
+                localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
+            }
+
             function saveToLocalStorage() {
                 if (!gm || !gm.FS) return;
                 try { gm.saveSaveFiles(); } catch(e) {}
+                // Method 1: EJS getSaveFile (most reliable — uses exact EJS path)
+                try {
+                    var data = gm.getSaveFile(false);
+                    if (data && data.length) {
+                        var path = gm.getSaveFilePath ? gm.getSaveFilePath() : null;
+                        var name = path ? path.split('/').pop() : 'save.srm';
+                        storeSave(name, data);
+                        return;
+                    }
+                } catch(e) {}
+                // Method 2: FS.readdir fallback
                 try {
                     var files = gm.FS.readdir("/data/saves/");
-                    var saveFile = null;
                     for (var i = 0; i < files.length; i++) {
                         if (files[i] !== "." && files[i] !== ".." && files[i] !== "Auto.cache") {
-                            saveFile = files[i];
-                            break;
+                            var d = gm.FS.readFile("/data/saves/" + files[i]);
+                            if (d) { storeSave(files[i], d); return; }
                         }
                     }
-                    if (!saveFile) return;
-                    var data = gm.FS.readFile("/data/saves/" + saveFile);
-                    if (!data) return;
-                    var arr = new Uint8Array(data);
-                    var bin = '';
-                    for (var i = 0; i < arr.length; i++) {
-                        bin += String.fromCharCode(arr[i]);
-                    }
-                    localStorage.setItem('_r1s_' + EJS_gameName + '_path', saveFile);
-                    localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
                 } catch(e) {}
             }
 
