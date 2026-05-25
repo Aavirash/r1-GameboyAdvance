@@ -189,10 +189,15 @@
                 }
             }
 
+            var gameName = "";
+            var n = location.search.match(/[?&]name=([^&]+)/);
+            if (n) gameName = decodeURIComponent(n[1]);
+
             EJS_player = "#game";
             EJS_core = "gba";
             EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
             EJS_gameUrl = romUrl;
+            if (gameName) EJS_gameName = gameName;
             EJS_startOnLoaded = true;
             EJS_hideSettings = true;
             EJS_volume = 0.5;
@@ -266,6 +271,27 @@
                     }
                 }, 1500);
             };
+
+            // Auto-save battery saves periodically and on unload
+            EJS_emulator.on("start", function() {
+                setTimeout(function() {
+                    var trySave = setInterval(function() {
+                        try {
+                            if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                                window.EJS_emulator.gameManager.saveSaveFiles();
+                            }
+                        } catch(e) {}
+                    }, 30000);
+                    window.addEventListener("beforeunload", function() {
+                        clearInterval(trySave);
+                        try {
+                            if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                                window.EJS_emulator.gameManager.saveSaveFiles();
+                            }
+                        } catch(e) {}
+                    });
+                }, 5000);
+            });
 
             function doInput(btn, keyCode, val) {
                 if (gm) {
