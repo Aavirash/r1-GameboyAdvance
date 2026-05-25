@@ -243,26 +243,26 @@
             var gm = null,
                 started = false;
 
+            function restoreFromLocalStorage(FS) {
+                try {
+                    var saved = localStorage.getItem('_r1s_' + EJS_gameName);
+                    if (!saved) return;
+                    var path = localStorage.getItem('_r1s_' + EJS_gameName + '_path');
+                    if (!path) return;
+                    var bin = atob(saved);
+                    var arr = new Uint8Array(bin.length);
+                    for (var i = 0; i < bin.length; i++) {
+                        arr[i] = bin.charCodeAt(i);
+                    }
+                    FS.writeFile("/data/saves/" + path, arr);
+                } catch(e) {}
+            }
+
             EJS_ready = function () {
                 if (window.EJS_emulator) {
                     window.EJS_emulator.startSaveInterval(10000);
                     window.EJS_emulator.on("saveDatabaseLoaded", function(FS) {
-                        try {
-                            var saved = localStorage.getItem('_r1s_' + EJS_gameName);
-                            if (!saved) return;
-                            var bin = atob(saved);
-                            var arr = new Uint8Array(bin.length);
-                            for (var i = 0; i < bin.length; i++) {
-                                arr[i] = bin.charCodeAt(i);
-                            }
-                            var gm = window.EJS_emulator.gameManager;
-                            if (!gm) return;
-                            var path = gm.getSaveFilePath ? gm.getSaveFilePath() : null;
-                            if (!path) {
-                                path = "/data/saves/" + (gm.romName || EJS_gameName) + "." + (gm.saveFileExt || "sav");
-                            }
-                            FS.writeFile(path, arr);
-                        } catch(e) {}
+                        restoreFromLocalStorage(FS);
                     });
                 }
             };
@@ -412,23 +412,33 @@
                 release(3, 13);
             });
 
-            document.getElementById("save-exit").addEventListener("click", function () {
+            function saveToLocalStorage() {
+                if (!gm || !gm.FS) return;
+                try { gm.saveSaveFiles(); } catch(e) {}
                 try {
-                    if (gm && typeof gm.saveSaveFiles === "function") {
-                        gm.saveSaveFiles();
-                    }
-                    if (gm && typeof gm.getSaveFile === "function") {
-                        var data = gm.getSaveFile(false);
-                        if (data) {
-                            var arr = new Uint8Array(data);
-                            var binary = '';
-                            for (var i = 0; i < arr.length; i++) {
-                                binary += String.fromCharCode(arr[i]);
-                            }
-                            localStorage.setItem('_r1s_' + EJS_gameName, btoa(binary));
+                    var files = gm.FS.readdir("/data/saves/");
+                    var saveFile = null;
+                    for (var i = 0; i < files.length; i++) {
+                        if (files[i] !== "." && files[i] !== ".." && files[i] !== "Auto.cache") {
+                            saveFile = files[i];
+                            break;
                         }
                     }
-                } catch (e) {}
+                    if (!saveFile) return;
+                    var data = gm.FS.readFile("/data/saves/" + saveFile);
+                    if (!data) return;
+                    var arr = new Uint8Array(data);
+                    var bin = '';
+                    for (var i = 0; i < arr.length; i++) {
+                        bin += String.fromCharCode(arr[i]);
+                    }
+                    localStorage.setItem('_r1s_' + EJS_gameName + '_path', saveFile);
+                    localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
+                } catch(e) {}
+            }
+
+            document.getElementById("save-exit").addEventListener("click", function () {
+                saveToLocalStorage();
                 window.location.href = "index.html";
             });
 
