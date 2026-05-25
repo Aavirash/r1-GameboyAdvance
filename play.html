@@ -189,15 +189,10 @@
                 }
             }
 
-            var gameName = "";
-            var n = location.search.match(/[?&]name=([^&]+)/);
-            if (n) gameName = decodeURIComponent(n[1]);
-
             EJS_player = "#game";
             EJS_core = "gba";
             EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
             EJS_gameUrl = romUrl;
-            if (gameName) EJS_gameName = gameName;
             EJS_startOnLoaded = true;
             EJS_hideSettings = true;
             EJS_volume = 0.5;
