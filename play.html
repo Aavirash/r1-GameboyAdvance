@@ -185,6 +185,16 @@
 
         <script>
             // --- AudioContext: 44100Hz + playback hint, rate_control=off + 256ms buffer ---
+            (function () {
+                try {
+                    var AC = window.AudioContext || window.webkitAudioContext;
+                    if (AC) {
+                        var ctx = new AC({ sampleRate: 44100, latencyHint: 'playback' });
+                        window.audioContext = ctx; // EJS picks this up if it exists
+                    }
+                } catch (e) {}
+            }());
+
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -230,14 +240,16 @@
                 exitEmulation: false,
             };
             EJS_defaultOptions = {
-                mgba_frameskip: 7,
+                mgba_frameskip: 2,
                 mgba_frameskip_threshold: "33",
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency", default: "512", isString: false },
-                { name: "video_threaded", default: "true" },
-                { name: "video_vsync", default: "false", isString: false },
+                { name: "audio_latency",      default: "256",     isString: false },
+                { name: "audio_rate_control", default: "false",   isString: false },
+                { name: "audio_resampler",    default: "nearest", isString: true  },
+                { name: "video_threaded",     default: "true"                      },
+                { name: "video_vsync",        default: "false",   isString: false  },
             ];
 
             var gm = null,
@@ -507,10 +519,14 @@
 
             function tryResumeCtx() {
                 try {
-                    var ctx =
-                        window.AudioContext &&
-                        (window.AudioContext._inst || new AudioContext());
-                    if (ctx && ctx.state === "suspended") ctx.resume();
+                    if (window.audioContext && window.audioContext.state === 'suspended')
+                        window.audioContext.resume();
+                } catch (e) {}
+                try {
+                    var ejs = window.EJS_emulator;
+                    var ac = ejs && (ejs.audioContext ||
+                             (ejs.gameManager && ejs.gameManager.audioContext));
+                    if (ac && ac.state === 'suspended') ac.resume();
                 } catch (e) {}
             }
             window.addEventListener("sideClick", tryResumeCtx);
