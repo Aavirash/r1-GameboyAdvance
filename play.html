@@ -115,6 +115,7 @@
                 pointer-events: auto;
                 touch-action: none;
                 -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
                 transform: rotate(-90deg);
@@ -229,15 +230,15 @@
                 exitEmulation: false,
             };
             EJS_defaultOptions = {
-                mgba_frameskip: 0,
+                mgba_frameskip: 1,
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency",      default: "512",          isString: false },
-                { name: "audio_rate_control", default: "true",          isString: false },
-                { name: "audio_resampler",    default: "sinc_fastest",  isString: true  },
-                { name: "video_threaded",     default: "true"                            },
-                { name: "video_vsync",        default: "false",         isString: false  },
+                { name: "audio_latency",      default: "192",  isString: false },
+                { name: "audio_rate_control", default: "true", isString: false },
+                { name: "audio_resampler",    default: "sinc", isString: true  },
+                { name: "video_threaded",     default: "true"                   },
+                { name: "video_vsync",        default: "false",isString: false  },
             ];
 
             var gm = null,
@@ -366,6 +367,7 @@
                 var kc = parseInt(el.dataset.kc);
                 el.addEventListener("pointerdown", function (e) {
                     e.preventDefault();
+                    if (navigator.vibrate) navigator.vibrate(0);
                     press(btn, kc);
                 });
                 el.addEventListener("pointerup", function (e) {
