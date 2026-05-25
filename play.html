@@ -158,6 +158,32 @@
                 width: 36px;
                 height: 36px;
             }
+            #save-exit {
+                position: absolute;
+                top: 24px;
+                right: 96px;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #FE5000;
+                font-size: 13px;
+                font-weight: 900;
+                pointer-events: auto;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+                border-radius: 4px;
+                background: rgba(0,0,0,0.6);
+                border: 1.5px solid #FE5000;
+                user-select: none;
+                -webkit-user-select: none;
+                line-height: 1;
+            }
+            #save-exit:active {
+                background: #FE5000;
+                color: #000;
+            }
         </style>
     </head>
     <body>
@@ -170,6 +196,7 @@
             <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
             <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
             <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
+            <div id="save-exit">S</div>
         </div>
 
         <script>
@@ -193,6 +220,7 @@
             EJS_core = "gba";
             EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
             EJS_gameUrl = romUrl;
+            EJS_gameName = romUrl.replace(/^.*[\/\\]/,'').replace(/\.gba$/i,'');
             EJS_startOnLoaded = true;
             EJS_hideSettings = true;
             EJS_volume = 0.5;
@@ -230,6 +258,12 @@
 
             var gm = null,
                 started = false;
+
+            EJS_ready = function () {
+                if (window.EJS_emulator) {
+                    window.EJS_emulator.startSaveInterval(10000);
+                }
+            };
 
             EJS_onGameStart = function () {
                 var tryGet = setInterval(function () {
@@ -374,6 +408,17 @@
                 longHeld = false;
                 clearTimeout(superLongTimer);
                 release(3, 13);
+            });
+
+            document.getElementById("save-exit").addEventListener("click", function () {
+                try {
+                    if (gm && typeof gm.saveSaveFiles === "function") {
+                        gm.saveSaveFiles();
+                    }
+                } catch (e) {}
+                setTimeout(function () {
+                    window.location.href = "index.html";
+                }, 500);
             });
 
             var scrollTimer = null,
