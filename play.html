@@ -243,42 +243,55 @@
             var gm = null,
                 started = false;
 
-            function restoreFromLocalStorage(FS) {
+            function restoreFromLocalStorage() {
                 try {
                     var saved = localStorage.getItem('_r1s_' + EJS_gameName);
-                    if (!saved) return;
-                    var fullPath = localStorage.getItem('_r1s_' + EJS_gameName + '_path');
-                    if (!fullPath) return;
-                    var plain = JSON.parse(saved);
-                    var arr = new Uint8Array(plain.length);
-                    for (var i = 0; i < plain.length; i++) {
-                        arr[i] = plain[i];
-                    }
-                    FS.writeFile(fullPath, arr);
+                    if (!saved || !gm || !gm.FS) return;
+                    var bytes;
+                    // base64 format (current)
                     try {
-                        var gm2 = window.EJS_emulator && window.EJS_emulator.gameManager;
-                        if (gm2 && gm2.loadSaveFiles) gm2.loadSaveFiles();
-                    } catch(e) {}
+                        var bin = atob(saved);
+                        bytes = new Uint8Array(bin.length);
+                        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                    } catch(e) {
+                        // legacy JSON array format
+                        try {
+                            var plain = JSON.parse(saved);
+                            bytes = new Uint8Array(plain.length);
+                            for (var j = 0; j < plain.length; j++) bytes[j] = plain[j];
+                        } catch(e2) { return; }
+                    }
+                    if (!bytes || !bytes.length) return;
+                    var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
+                                   ('/data/saves/' + EJS_gameName + '.srm');
+                    try { gm.FS.mkdir('/data'); } catch(e) {}
+                    try { gm.FS.mkdir('/data/saves'); } catch(e) {}
+                    gm.FS.writeFile(savePath, bytes);
+                    try { gm.loadSaveFiles(); } catch(e) {}
                 } catch(e) {}
             }
 
             EJS_ready = function () {
-                if (window.EJS_emulator) {
-                    window.EJS_emulator.startSaveInterval(10000);
-                    window.EJS_emulator.on("saveDatabaseLoaded", function(FS) {
-                        restoreFromLocalStorage(FS);
-                    });
-                }
+                var tryReady = setInterval(function () {
+                    if (window.EJS_emulator) {
+                        clearInterval(tryReady);
+                        try { window.EJS_emulator.startSaveInterval(10000); } catch(e) {}
+                    }
+                }, 200);
             };
 
             EJS_onGameStart = function () {
-                try {
+                var tryGet = setInterval(function () {
                     if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-                        window.EJS_emulator.gameManager.loadSaveFiles();
+                        clearInterval(tryGet);
                         gm = window.EJS_emulator.gameManager;
                         started = true;
+                        // Restore save from localStorage
+                        setTimeout(restoreFromLocalStorage, 800);
+                        // Auto-save every 30s
+                        setInterval(saveToLocalStorage, 30000);
                     }
-                } catch(e) {}
+                }, 300);
                 setTimeout(function () {
                     var cvs = document.querySelector("#game canvas");
                     if (!cvs) return;
@@ -412,42 +425,51 @@
             });
 
             function storeSaveBytes(fullPath, data) {
-                if (!data) return;
-                var arr = new Uint8Array(data);
-                var plain = [];
-                for (var i = 0; i < arr.length; i++) {
-                    plain.push(arr[i]);
-                }
-                localStorage.setItem('_r1s_' + EJS_gameName + '_path', fullPath);
-                localStorage.setItem('_r1s_' + EJS_gameName, JSON.stringify(plain));
+                if (!data || !data.length) return false;
+                try {
+                    var arr = new Uint8Array(data);
+                    var bin = '';
+                    for (var i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+                    localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
+                    localStorage.setItem('_r1s_' + EJS_gameName + '_path', fullPath);
+                    return true;
+                } catch(e) { return false; }
             }
 
-            function saveToLocalStorage() {
-                if (!gm || !gm.FS) return;
+            function saveToLocalStorage(callback) {
+                if (!gm || !gm.FS) { if (callback) callback(false); return; }
                 try { gm.saveSaveFiles(); } catch(e) {}
-                // Method 1: EJS getSaveFile (most reliable — uses exact EJS path)
-                try {
-                    var data = gm.getSaveFile(false);
-                    if (data && data.length) {
-                        var path = gm.getSaveFilePath ? gm.getSaveFilePath() : '';
-                        if (path) { storeSaveBytes(path, data); return; }
+                // Wait 500ms for mGBA core to flush SRAM to virtual FS
+                setTimeout(function () {
+                    var ok = false;
+                    // Try direct known path first
+                    var directPath = '/data/saves/' + EJS_gameName + '.srm';
+                    try {
+                        var d = gm.FS.readFile(directPath);
+                        if (d && d.length) { ok = storeSaveBytes(directPath, d); }
+                    } catch(e) {}
+                    // Fallback: scan saves directory
+                    if (!ok) {
+                        try {
+                            var files = gm.FS.readdir('/data/saves/');
+                            for (var i = 0; i < files.length; i++) {
+                                if (files[i] !== '.' && files[i] !== '..' && files[i] !== 'Auto.cache') {
+                                    var fd = gm.FS.readFile('/data/saves/' + files[i]);
+                                    if (fd && fd.length) { ok = storeSaveBytes('/data/saves/' + files[i], fd); break; }
+                                }
+                            }
+                        } catch(e) {}
                     }
-                } catch(e) {}
-                // Method 2: FS.readdir fallback
-                try {
-                    var files = gm.FS.readdir("/data/saves/");
-                    for (var i = 0; i < files.length; i++) {
-                        if (files[i] !== "." && files[i] !== ".." && files[i] !== "Auto.cache") {
-                            var d = gm.FS.readFile("/data/saves/" + files[i]);
-                            if (d) { storeSaveBytes("/data/saves/" + files[i], d); return; }
-                        }
-                    }
-                } catch(e) {}
+                    if (callback) callback(ok);
+                }, 500);
             }
 
             document.getElementById("save-exit").addEventListener("click", function () {
-                saveToLocalStorage();
-                window.location.href = "index.html";
+                this.textContent = "…";
+                this.style.pointerEvents = "none";
+                saveToLocalStorage(function () {
+                    window.location.href = "index.html";
+                });
             });
 
             var scrollTimer = null,
