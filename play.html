@@ -400,6 +400,14 @@
                         gm.saveSaveFiles();
                     }
                 } catch (e) {}
+                try {
+                    if (gm && gm.FS && typeof gm.FS.syncfs === "function") {
+                        gm.FS.syncfs(false, function () {
+                            window.location.href = "index.html";
+                        });
+                        return;
+                    }
+                } catch (e) {}
                 setTimeout(function () {
                     window.location.href = "index.html";
                 }, 500);
