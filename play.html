@@ -247,14 +247,14 @@
                 try {
                     var saved = localStorage.getItem('_r1s_' + EJS_gameName);
                     if (!saved) return;
-                    var path = localStorage.getItem('_r1s_' + EJS_gameName + '_path');
-                    if (!path) return;
-                    var bin = atob(saved);
-                    var arr = new Uint8Array(bin.length);
-                    for (var i = 0; i < bin.length; i++) {
-                        arr[i] = bin.charCodeAt(i);
+                    var fullPath = localStorage.getItem('_r1s_' + EJS_gameName + '_path');
+                    if (!fullPath) return;
+                    var plain = JSON.parse(saved);
+                    var arr = new Uint8Array(plain.length);
+                    for (var i = 0; i < plain.length; i++) {
+                        arr[i] = plain[i];
                     }
-                    FS.writeFile("/data/saves/" + path, arr);
+                    FS.writeFile(fullPath, arr);
                     try {
                         var gm2 = window.EJS_emulator && window.EJS_emulator.gameManager;
                         if (gm2 && gm2.loadSaveFiles) gm2.loadSaveFiles();
@@ -272,19 +272,13 @@
             };
 
             EJS_onGameStart = function () {
-                var tryGet = setInterval(function () {
-                    try {
-                        if (
-                            window.EJS_emulator &&
-                            window.EJS_emulator.gameManager
-                        ) {
-                            gm = window.EJS_emulator.gameManager;
-                            try { gm.loadSaveFiles(); } catch(e) {}
-                            started = true;
-                            clearInterval(tryGet);
-                        }
-                    } catch (e) {}
-                }, 300);
+                try {
+                    if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+                        window.EJS_emulator.gameManager.loadSaveFiles();
+                        gm = window.EJS_emulator.gameManager;
+                        started = true;
+                    }
+                } catch(e) {}
                 setTimeout(function () {
                     var cvs = document.querySelector("#game canvas");
                     if (!cvs) return;
@@ -417,15 +411,15 @@
                 release(3, 13);
             });
 
-            function storeSave(name, data) {
+            function storeSaveBytes(fullPath, data) {
                 if (!data) return;
                 var arr = new Uint8Array(data);
-                var bin = '';
+                var plain = [];
                 for (var i = 0; i < arr.length; i++) {
-                    bin += String.fromCharCode(arr[i]);
+                    plain.push(arr[i]);
                 }
-                localStorage.setItem('_r1s_' + EJS_gameName + '_path', name);
-                localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
+                localStorage.setItem('_r1s_' + EJS_gameName + '_path', fullPath);
+                localStorage.setItem('_r1s_' + EJS_gameName, JSON.stringify(plain));
             }
 
             function saveToLocalStorage() {
@@ -435,10 +429,8 @@
                 try {
                     var data = gm.getSaveFile(false);
                     if (data && data.length) {
-                        var path = gm.getSaveFilePath ? gm.getSaveFilePath() : null;
-                        var name = path ? path.split('/').pop() : 'save.srm';
-                        storeSave(name, data);
-                        return;
+                        var path = gm.getSaveFilePath ? gm.getSaveFilePath() : '';
+                        if (path) { storeSaveBytes(path, data); return; }
                     }
                 } catch(e) {}
                 // Method 2: FS.readdir fallback
@@ -447,7 +439,7 @@
                     for (var i = 0; i < files.length; i++) {
                         if (files[i] !== "." && files[i] !== ".." && files[i] !== "Auto.cache") {
                             var d = gm.FS.readFile("/data/saves/" + files[i]);
-                            if (d) { storeSave(files[i], d); return; }
+                            if (d) { storeSaveBytes("/data/saves/" + files[i], d); return; }
                         }
                     }
                 } catch(e) {}
