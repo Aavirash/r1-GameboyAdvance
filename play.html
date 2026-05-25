@@ -246,6 +246,24 @@
             EJS_ready = function () {
                 if (window.EJS_emulator) {
                     window.EJS_emulator.startSaveInterval(10000);
+                    window.EJS_emulator.on("saveDatabaseLoaded", function(FS) {
+                        try {
+                            var saved = localStorage.getItem('_r1s_' + EJS_gameName);
+                            if (!saved) return;
+                            var bin = atob(saved);
+                            var arr = new Uint8Array(bin.length);
+                            for (var i = 0; i < bin.length; i++) {
+                                arr[i] = bin.charCodeAt(i);
+                            }
+                            var gm = window.EJS_emulator.gameManager;
+                            if (!gm) return;
+                            var path = gm.getSaveFilePath ? gm.getSaveFilePath() : null;
+                            if (!path) {
+                                path = "/data/saves/" + (gm.romName || EJS_gameName) + "." + (gm.saveFileExt || "sav");
+                            }
+                            FS.writeFile(path, arr);
+                        } catch(e) {}
+                    });
                 }
             };
 
@@ -399,18 +417,19 @@
                     if (gm && typeof gm.saveSaveFiles === "function") {
                         gm.saveSaveFiles();
                     }
-                } catch (e) {}
-                try {
-                    if (gm && gm.FS && typeof gm.FS.syncfs === "function") {
-                        gm.FS.syncfs(false, function () {
-                            window.location.href = "index.html";
-                        });
-                        return;
+                    if (gm && typeof gm.getSaveFile === "function") {
+                        var data = gm.getSaveFile(false);
+                        if (data) {
+                            var arr = new Uint8Array(data);
+                            var binary = '';
+                            for (var i = 0; i < arr.length; i++) {
+                                binary += String.fromCharCode(arr[i]);
+                            }
+                            localStorage.setItem('_r1s_' + EJS_gameName, btoa(binary));
+                        }
                     }
                 } catch (e) {}
-                setTimeout(function () {
-                    window.location.href = "index.html";
-                }, 500);
+                window.location.href = "index.html";
             });
 
             var scrollTimer = null,
