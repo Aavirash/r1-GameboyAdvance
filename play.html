@@ -275,6 +275,7 @@
                             window.EJS_emulator.gameManager
                         ) {
                             gm = window.EJS_emulator.gameManager;
+                            try { gm.loadSaveFiles(); } catch(e) {}
                             started = true;
                             clearInterval(tryGet);
                         }
