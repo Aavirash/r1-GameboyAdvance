@@ -219,6 +219,44 @@
                 }
             }
 
+            #save-overlay {
+                position: fixed;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0, 0, 0, 0.35);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.16s ease;
+                z-index: 2147483648;
+            }
+            #save-overlay.show {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            #save-overlay-card {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 10px;
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: rgba(0, 0, 0, 0.65);
+                color: rgba(255, 255, 255, 0.9);
+                font-size: 10px;
+                letter-spacing: 0.2px;
+            }
+            #save-overlay-spinner {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-top-color: rgba(255, 255, 255, 0.95);
+                animation: save-spin 0.8s linear infinite;
+                flex-shrink: 0;
+            }
+
         </style>
     </head>
     <body>
@@ -236,6 +274,12 @@
             <div id="save-status" class="idle" role="status" aria-live="polite">
                 <span class="save-spinner" aria-hidden="true"></span>
                 <span id="save-status-text">Saved</span>
+            </div>
+        </div>
+        <div id="save-overlay" aria-hidden="true">
+            <div id="save-overlay-card" role="status" aria-live="polite">
+                <span id="save-overlay-spinner" aria-hidden="true"></span>
+                <span id="save-overlay-text">Syncing save...</span>
             </div>
         </div>
 
@@ -312,6 +356,8 @@
                 saveQueue = Promise.resolve(),
                 saveStatusEl = null,
                 saveStatusTextEl = null,
+                saveOverlayEl = null,
+                saveOverlayTextEl = null,
                 saveStatusHideTimer = null,
                 dirtyPollTimer = null,
                 dirtyBurstTimers = [],
@@ -334,6 +380,21 @@
             function ensureSaveStatus() {
                 if (!saveStatusEl) saveStatusEl = document.getElementById('save-status');
                 if (!saveStatusTextEl) saveStatusTextEl = document.getElementById('save-status-text');
+                if (!saveOverlayEl) saveOverlayEl = document.getElementById('save-overlay');
+                if (!saveOverlayTextEl) saveOverlayTextEl = document.getElementById('save-overlay-text');
+            }
+
+            function setSaveOverlay(show, text) {
+                ensureSaveStatus();
+                if (!saveOverlayEl || !saveOverlayTextEl) return;
+                if (text) saveOverlayTextEl.textContent = text;
+                if (show) {
+                    saveOverlayEl.classList.add('show');
+                    saveOverlayEl.setAttribute('aria-hidden', 'false');
+                } else {
+                    saveOverlayEl.classList.remove('show');
+                    saveOverlayEl.setAttribute('aria-hidden', 'true');
+                }
             }
 
             function setSaveStatus(text, isSaving, holdMs) {
@@ -387,6 +448,7 @@
                 if (gen !== dirtySyncGeneration || dirtySyncSettled) return;
                 dirtySyncSettled = true;
                 clearDirtyBurstTimers();
+                setSaveOverlay(false);
                 if (ok) {
                     setSaveStatus('Safe to Exit', false, 2400);
                 } else {
@@ -400,6 +462,7 @@
                 dirtySyncSettled = false;
                 dirtySyncStartAt = Date.now();
                 clearDirtyBurstTimers();
+                setSaveOverlay(true, 'Syncing save...');
                 setSaveStatus('Saving...', true);
 
                 var schedule = [0, 1200, 2800, 5200, 8200, 12000];
