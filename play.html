@@ -423,9 +423,8 @@
                     var ptr = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
                     var size = M._retro_get_memory_size(2);
                     if (!(ptr > 0 && size >= 64)) return null;
-                    var step = Math.max(1, Math.floor(size / 192));
                     var h = 2166136261 >>> 0;
-                    for (var i = 0; i < size; i += step) {
+                    for (var i = 0; i < size; i++) {
                         h ^= M.HEAPU8[ptr + i];
                         h = Math.imul(h, 16777619) >>> 0;
                     }
@@ -435,6 +434,24 @@
                 } catch (e) {
                     return null;
                 }
+            }
+
+            function getFsSaveFingerprint() {
+                if (!gm || !gm.FS) return null;
+                try {
+                    var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
+                                   ('/data/saves/' + EJS_gameName + '.srm');
+                    var candidates = [savePath, '/data/saves/' + EJS_gameName + '.srm', '/data/saves/' + EJS_gameName + '.sav'];
+                    for (var i = 0; i < candidates.length; i++) {
+                        try {
+                            var d = gm.FS.readFile(candidates[i]);
+                            if (!d || d.length < 64) continue;
+                            var arr = new Uint8Array(d);
+                            return 'fs:' + hashBytes(arr).toString(16) + ':' + arr.length;
+                        } catch (e) {}
+                    }
+                } catch (e2) {}
+                return null;
             }
 
             function clearDirtyBurstTimers() {
@@ -487,10 +504,10 @@
 
             function startDirtyWatcher() {
                 if (dirtyPollTimer) clearInterval(dirtyPollTimer);
-                dirtyLastFingerprint = getSaveRamFingerprint();
+                dirtyLastFingerprint = getSaveRamFingerprint() || getFsSaveFingerprint();
                 dirtyPollTimer = setInterval(function () {
                     if (!started || !gm) return;
-                    var next = getSaveRamFingerprint();
+                    var next = getSaveRamFingerprint() || getFsSaveFingerprint();
                     if (!next) return;
                     if (!dirtyLastFingerprint) {
                         dirtyLastFingerprint = next;
@@ -500,7 +517,7 @@
                         dirtyLastFingerprint = next;
                         startDirtySyncBurst();
                     }
-                }, 1000);
+                }, 500);
             }
 
             function queueSave(reason, callback) {
@@ -651,7 +668,7 @@
                             queueSave('autosave-interval');
                         }, 8000);
                         setTimeout(function () {
-                            dirtyLastFingerprint = getSaveRamFingerprint() || dirtyLastFingerprint;
+                            dirtyLastFingerprint = getSaveRamFingerprint() || getFsSaveFingerprint() || dirtyLastFingerprint;
                         }, 1300);
                         setTimeout(startDirtyWatcher, 2500);
                     }
