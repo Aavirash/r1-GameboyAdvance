@@ -770,9 +770,16 @@
                 if (now - lastCloseCheckpointAt < 1000) return;
                 lastCloseCheckpointAt = now;
 
-                // Close-time SRAM can be stale/uninitialized on some devices.
-                // Use queued FS sync only to avoid clobbering a good committed save.
-                saveToLocalStorage(null, 'close-fs-sync');
+                var ok = false;
+                var snap = readSramSnapshot();
+                if (snap && snap.length >= 64) {
+                    ok = storeSaveBytes(canonicalSavePath(), snap, { source: 'close-checkpoint' });
+                }
+
+                // If SRAM snapshot is unavailable, fall back to queued FS-based save.
+                if (!ok) {
+                    saveToLocalStorage(null, 'close-fs-sync');
+                }
             }
 
             window.addEventListener('pagehide', checkpointOnClose, true);
