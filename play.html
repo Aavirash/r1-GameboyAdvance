@@ -179,6 +179,7 @@
             }
 
             #save-status {
+                display: none !important;
                 position: absolute;
                 left: 50%;
                 bottom: 8px;
@@ -407,21 +408,7 @@
             }
 
             function setSaveStatus(text, isSaving, holdMs) {
-                ensureSaveStatus();
-                if (!saveStatusEl || !saveStatusTextEl) return;
-                saveStatusTextEl.textContent = text;
-                saveStatusEl.classList.add('show');
-                if (isSaving) {
-                    saveStatusEl.classList.remove('idle');
-                } else {
-                    saveStatusEl.classList.add('idle');
-                }
-                clearTimeout(saveStatusHideTimer);
-                if (!isSaving) {
-                    saveStatusHideTimer = setTimeout(function () {
-                        if (saveStatusEl) saveStatusEl.classList.remove('show');
-                    }, holdMs || 1800);
-                }
+                return;
             }
 
             function getSaveRamFingerprint() {
