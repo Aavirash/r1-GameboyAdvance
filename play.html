@@ -237,7 +237,7 @@
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency",      default: "192",  isString: false },
+                { name: "audio_latency",      default: "256",  isString: false },
                 { name: "audio_rate_control", default: "true", isString: false },
                 { name: "audio_resampler",    default: "sinc", isString: true  },
                 { name: "video_threaded",     default: "true"                   },
@@ -245,54 +245,7 @@
             ];
 
             var gm = null,
-                started = false,
-                autoSaveTimer = null;
-
-            function getCoreModule() {
-                var ejs = window.EJS_emulator;
-                return (gm && gm.Module) ||
-                       (ejs && (ejs.Module || (ejs.gameManager && ejs.gameManager.Module))) ||
-                       null;
-            }
-
-            function getCoreSaveRamInfo() {
-                try {
-                    var M = getCoreModule();
-                    if (!M || !M.HEAPU8) return null;
-                    var ptr = 0;
-                    var size = 0;
-                    if (M._retro_get_memory_data && M._retro_get_memory_size) {
-                        ptr = M._retro_get_memory_data(2);
-                        size = M._retro_get_memory_size(2);
-                    } else if (M.ccall) {
-                        ptr = M.ccall('retro_get_memory_data', 'number', ['number'], [2]);
-                        size = M.ccall('retro_get_memory_size', 'number', ['number'], [2]);
-                    }
-                    if (ptr > 0 && size > 0) return { M: M, ptr: ptr, size: size };
-                } catch (e) {}
-                return null;
-            }
-
-            function readCoreSaveRam() {
-                var info = getCoreSaveRamInfo();
-                if (!info) return null;
-                try {
-                    var out = new Uint8Array(info.size);
-                    out.set(info.M.HEAPU8.subarray(info.ptr, info.ptr + info.size));
-                    return out;
-                } catch (e) { return null; }
-            }
-
-            function writeCoreSaveRam(bytes) {
-                if (!bytes || !bytes.length) return false;
-                var info = getCoreSaveRamInfo();
-                if (!info) return false;
-                try {
-                    var len = Math.min(bytes.length, info.size);
-                    info.M.HEAPU8.set(bytes.subarray(0, len), info.ptr);
-                    return true;
-                } catch (e) { return false; }
-            }
+                started = false;
 
             function restoreFromLocalStorage() {
                 try {
@@ -311,25 +264,45 @@
                         } catch(e2) { return; }
                     }
                     if (!bytes || !bytes.length) return;
+                    // Method 1: write directly into WASM SRAM memory — bypasses all FS/IndexedDB races
+                    var sramDone = false;
+                    try {
+                        var M = gm.Module || (window.EJS_emulator && window.EJS_emulator.Module);
+                        if (M && M.HEAPU8 && M._retro_get_memory_data && M._retro_get_memory_size) {
+                            var ptr  = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
+                            var size = M._retro_get_memory_size(2);
+                            if (ptr > 0 && size > 0) {
+                                var len = Math.min(bytes.length, size);
+                                for (var k = 0; k < len; k++) M.HEAPU8[ptr + k] = bytes[k];
+                                sramDone = true;
+                            }
+                        }
+                    } catch(e) {}
+
+                    // Method 2: write to FS — always do this so saveSaveFiles() flushes correct data
                     var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
                                    ('/data/saves/' + EJS_gameName + '.srm');
                     try { gm.FS.mkdir('/data'); } catch(e) {}
                     try { gm.FS.mkdir('/data/saves'); } catch(e) {}
                     try { gm.FS.writeFile(savePath, bytes); } catch(e) {}
 
-                    // Primary restore path: write directly into live SRAM.
-                    var restored = writeCoreSaveRam(bytes);
-                    if (!restored) {
-                        // Retry once after core settles.
+                    // Only call loadSaveFiles if direct SRAM write failed
+                    // (loadSaveFiles does IndexedDB sync that can race with startSaveInterval)
+                    if (!sramDone) {
                         setTimeout(function () {
-                            writeCoreSaveRam(bytes);
-                        }, 600);
+                            try { gm.loadSaveFiles(); } catch(e) {}
+                        }, 300);
                     }
                 } catch(e) {}
             }
 
             EJS_ready = function () {
-                // Intentionally no EJS periodic save sync; localStorage is authoritative.
+                var tryReady = setInterval(function () {
+                    if (window.EJS_emulator) {
+                        clearInterval(tryReady);
+                        try { window.EJS_emulator.startSaveInterval(10000); } catch(e) {}
+                    }
+                }, 200);
             };
 
             EJS_onGameStart = function () {
@@ -338,13 +311,10 @@
                         clearInterval(tryGet);
                         gm = window.EJS_emulator.gameManager;
                         started = true;
-                        // Restore once core is fully initialized.
-                        setTimeout(restoreFromLocalStorage, 1200);
-                        if (autoSaveTimer) clearInterval(autoSaveTimer);
-                        // Lightweight periodic backup.
-                        autoSaveTimer = setInterval(function () {
-                            saveToLocalStorage();
-                        }, 120000);
+                        // Restore save from localStorage
+                        setTimeout(restoreFromLocalStorage, 800);
+                        // Auto-save every 30s
+                        setInterval(saveToLocalStorage, 30000);
                     }
                 }, 300);
                 setTimeout(function () {
@@ -416,32 +386,21 @@
                 }, ms || 80);
             }
 
-            var _vibrateKiller = null;
             document.querySelectorAll(".gp-btn").forEach(function (el) {
                 var btn = parseInt(el.dataset.btn);
                 var kc = parseInt(el.dataset.kc);
                 el.addEventListener("pointerdown", function (e) {
                     e.preventDefault();
-                    // Cancel vibration and keep canceling every 80ms during the hold
-                    // Android fires haptic at ~500ms; we beat it continuously
-                    clearInterval(_vibrateKiller);
-                    try { if (navigator.vibrate) navigator.vibrate(0); } catch(ex) {}
-                    _vibrateKiller = setInterval(function () {
-                        try { if (navigator.vibrate) navigator.vibrate(0); } catch(ex) {}
-                    }, 40);
                     press(btn, kc);
                 });
                 el.addEventListener("pointerup", function (e) {
                     e.preventDefault();
-                    clearInterval(_vibrateKiller);
                     release(btn, kc);
                 });
                 el.addEventListener("pointerleave", function () {
-                    clearInterval(_vibrateKiller);
                     release(btn, kc);
                 });
                 el.addEventListener("pointercancel", function () {
-                    clearInterval(_vibrateKiller);
                     release(btn, kc);
                 });
                 el.addEventListener("contextmenu", function (e) {
@@ -510,72 +469,66 @@
             function saveToLocalStorage(callback) {
                 if (!gm || !gm.FS) { if (callback) callback(false); return; }
 
-                function norm(s) {
-                    return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                }
-
-                // Let in-game save/overwrite commit before reading SRAM.
-                setTimeout(function () {
+                function readFS() {
                     var ok = false;
-                    var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
-                                   ('/data/saves/' + EJS_gameName + '.srm');
-
-                    // Primary path: direct SRAM snapshot.
-                    var core = readCoreSaveRam();
-                    if (core && core.length >= 64) {
-                        ok = storeSaveBytes(savePath, core);
-                    }
-
-                    // Keep EJS internal DB in sync where supported.
-                    try { gm.saveSaveFiles(); } catch (e) {}
+                    // Try expected path(s) first so overwrites stay on the same file.
+                    try {
+                        var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
+                                       ('/data/saves/' + EJS_gameName + '.srm');
+                        var candidates = [
+                            savePath,
+                            '/data/saves/' + EJS_gameName + '.srm',
+                            '/data/saves/' + EJS_gameName + '.sav'
+                        ];
+                        for (var c = 0; c < candidates.length; c++) {
+                            try {
+                                var d0 = gm.FS.readFile(candidates[c]);
+                                if (d0 && d0.length >= 64) {
+                                    ok = storeSaveBytes(candidates[c], d0);
+                                    break;
+                                }
+                            } catch (e) {}
+                        }
+                    } catch (e) {}
 
                     if (ok) {
                         if (callback) callback(true);
                         return;
                     }
 
-                    // Fallback: read direct save files.
-                    var candidates = [
-                        savePath,
-                        '/data/saves/' + EJS_gameName + '.srm',
-                        '/data/saves/' + EJS_gameName + '.sav'
-                    ];
-                    for (var c = 0; c < candidates.length; c++) {
-                        try {
-                            var cd = gm.FS.readFile(candidates[c]);
-                            if (cd && cd.length >= 64) {
-                                ok = storeSaveBytes(candidates[c], cd);
-                                break;
-                            }
-                        } catch (e) {}
-                    }
-
-                    // Final fallback: best-matching file by ROM name.
-                    if (!ok) {
-                        try {
-                            var files = gm.FS.readdir('/data/saves/');
-                            var target = norm(EJS_gameName);
-                            var best = null;
-                            var bestSize = 0;
-                            for (var i = 0; i < files.length; i++) {
-                                var f = files[i];
-                                if (f === '.' || f === '..' || f === 'Auto.cache') continue;
-                                var fNorm = norm(f);
-                                if (target && fNorm.indexOf(target) === -1) continue;
-                                try {
-                                    var fd = gm.FS.readFile('/data/saves/' + f);
-                                    if (fd && fd.length >= 64 && fd.length > bestSize) {
-                                        best = { path: '/data/saves/' + f, data: fd };
-                                        bestSize = fd.length;
-                                    }
-                                } catch (e) {}
-                            }
-                            if (best) ok = storeSaveBytes(best.path, best.data);
-                        } catch (e) {}
-                    }
-
+                    // Read largest valid save file in /data/saves/ (not just first)
+                    try {
+                        var files = gm.FS.readdir('/data/saves/');
+                        var best = null, bestSize = 0;
+                        for (var i = 0; i < files.length; i++) {
+                            var f = files[i];
+                            if (f === '.' || f === '..' || f === 'Auto.cache') continue;
+                            try {
+                                var fd = gm.FS.readFile('/data/saves/' + f);
+                                if (fd && fd.length > bestSize && fd.length >= 64) {
+                                    best = { path: '/data/saves/' + f, data: fd };
+                                    bestSize = fd.length;
+                                }
+                            } catch(e) {}
+                        }
+                        if (best) ok = storeSaveBytes(best.path, best.data);
+                    } catch(e) {}
                     if (callback) callback(ok);
-                }, 250);
+                }
+
+                try {
+                    var p = gm.saveSaveFiles();
+                    if (p && typeof p.then === 'function') {
+                        // saveSaveFiles returned a Promise — wait extra for overwrite flush on R1
+                        p.then(function () { setTimeout(readFS, 900); })
+                         .catch(function () { setTimeout(readFS, 2000); });
+                    } else {
+                        // No Promise — conservative delay for R1 WASM flush
+                        setTimeout(readFS, 2000);
+                    }
+                } catch(e) {
+                    setTimeout(readFS, 2000);
+                }
             }
 
             document.getElementById("save-exit").addEventListener("click", function () {
