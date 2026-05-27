@@ -186,6 +186,13 @@
         </div>
 
         <script>
+            // Hard-disable web vibrate calls (from any source, including hidden controls).
+            try {
+                if (navigator && typeof navigator.vibrate === 'function') {
+                    navigator.vibrate = function () { return false; };
+                }
+            } catch (e) {}
+
             var romUrl = "";
             var m = location.search.match(/[?&]rom=([^&]+)/);
             if (m) {
@@ -237,8 +244,9 @@
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency",      default: "256",  isString: false },
+                { name: "audio_latency",      default: "224",  isString: false },
                 { name: "audio_rate_control", default: "true", isString: false },
+                { name: "audio_rate_control_delta", default: "0.0015", isString: false },
                 { name: "audio_resampler",    default: "sinc", isString: true  },
                 { name: "video_threaded",     default: "true"                   },
                 { name: "video_vsync",        default: "false", isString: false },
@@ -247,10 +255,10 @@
             var gm = null,
                 started = false;
 
-            function restoreFromLocalStorage() {
+            function restoreFromLocalStorage(fsOverride) {
                 try {
                     var saved = localStorage.getItem('_r1s_' + EJS_gameName);
-                    if (!saved || !gm || !gm.FS) return;
+                    if (!saved) return false;
                     var bytes;
                     try {
                         var bin = atob(saved);
@@ -261,30 +269,38 @@
                             var plain = JSON.parse(saved);
                             bytes = new Uint8Array(plain.length);
                             for (var j = 0; j < plain.length; j++) bytes[j] = plain[j];
-                        } catch(e2) { return; }
+                        } catch(e2) { return false; }
                     }
-                    if (!bytes || !bytes.length) return;
+                    if (!bytes || !bytes.length) return false;
+
+                    var fs = fsOverride || (gm && gm.FS);
+                    if (!fs) return false;
+
                     // Method 1: write directly into WASM SRAM memory — bypasses all FS/IndexedDB races
                     var sramDone = false;
-                    try {
-                        var M = gm.Module || (window.EJS_emulator && window.EJS_emulator.Module);
-                        if (M && M.HEAPU8 && M._retro_get_memory_data && M._retro_get_memory_size) {
-                            var ptr  = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
-                            var size = M._retro_get_memory_size(2);
-                            if (ptr > 0 && size > 0) {
-                                var len = Math.min(bytes.length, size);
-                                for (var k = 0; k < len; k++) M.HEAPU8[ptr + k] = bytes[k];
-                                sramDone = true;
+                    if (!fsOverride && gm) {
+                        try {
+                            var M = gm.Module || (window.EJS_emulator && window.EJS_emulator.Module);
+                            if (M && M.HEAPU8 && M._retro_get_memory_data && M._retro_get_memory_size) {
+                                var ptr  = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
+                                var size = M._retro_get_memory_size(2);
+                                if (ptr > 0 && size > 0) {
+                                    var len = Math.min(bytes.length, size);
+                                    for (var k = 0; k < len; k++) M.HEAPU8[ptr + k] = bytes[k];
+                                    sramDone = true;
+                                }
                             }
-                        }
-                    } catch(e) {}
+                        } catch(e) {}
+                    }
 
                     // Method 2: write to FS — always do this so saveSaveFiles() flushes correct data
                     var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
                                    ('/data/saves/' + EJS_gameName + '.srm');
-                    try { gm.FS.mkdir('/data'); } catch(e) {}
-                    try { gm.FS.mkdir('/data/saves'); } catch(e) {}
-                    try { gm.FS.writeFile(savePath, bytes); } catch(e) {}
+                    try { fs.mkdir('/data'); } catch(e) {}
+                    try { fs.mkdir('/data/saves'); } catch(e) {}
+                    try { fs.writeFile(savePath, bytes); } catch(e) {}
+
+                    if (fsOverride) return true;
 
                     // Only call loadSaveFiles if direct SRAM write failed
                     // (loadSaveFiles does IndexedDB sync that can race with startSaveInterval)
@@ -293,7 +309,8 @@
                             try { gm.loadSaveFiles(); } catch(e) {}
                         }, 300);
                     }
-                } catch(e) {}
+                    return true;
+                } catch(e) { return false; }
             }
 
             EJS_ready = function () {
@@ -301,6 +318,12 @@
                     if (window.EJS_emulator) {
                         clearInterval(tryReady);
                         try { window.EJS_emulator.startSaveInterval(10000); } catch(e) {}
+                        try {
+                            window.EJS_emulator.on('saveDatabaseLoaded', function (FS) {
+                                // Pre-boot restore so games detect save on first open.
+                                restoreFromLocalStorage(FS);
+                            });
+                        } catch (e) {}
                     }
                 }, 200);
             };
@@ -391,10 +414,12 @@
                 var kc = parseInt(el.dataset.kc);
                 el.addEventListener("pointerdown", function (e) {
                     e.preventDefault();
+                    e.stopPropagation();
                     press(btn, kc);
                 });
                 el.addEventListener("pointerup", function (e) {
                     e.preventDefault();
+                    e.stopPropagation();
                     release(btn, kc);
                 });
                 el.addEventListener("pointerleave", function () {
@@ -402,6 +427,26 @@
                 });
                 el.addEventListener("pointercancel", function () {
                     release(btn, kc);
+                });
+                el.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                el.addEventListener("touchstart", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, { passive: false });
+                el.addEventListener("touchend", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, { passive: false });
+                el.addEventListener("mousedown", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                el.addEventListener("mouseup", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 });
                 el.addEventListener("contextmenu", function (e) {
                     e.preventDefault();
