@@ -229,7 +229,7 @@
                 opacity: 0;
                 pointer-events: none;
                 transition: opacity 0.16s ease;
-                z-index: 2147483648;
+                z-index: 2147483647;
             }
             #save-overlay.show {
                 opacity: 1;
@@ -275,11 +275,11 @@
                 <span class="save-spinner" aria-hidden="true"></span>
                 <span id="save-status-text">Saved</span>
             </div>
-        </div>
-        <div id="save-overlay" aria-hidden="true">
-            <div id="save-overlay-card" role="status" aria-live="polite">
-                <span id="save-overlay-spinner" aria-hidden="true"></span>
-                <span id="save-overlay-text">Syncing save...</span>
+            <div id="save-overlay" aria-hidden="true">
+                <div id="save-overlay-card" role="status" aria-live="polite">
+                    <span id="save-overlay-spinner" aria-hidden="true"></span>
+                    <span id="save-overlay-text">Syncing save...</span>
+                </div>
             </div>
         </div>
 
@@ -467,6 +467,7 @@
             function scheduleDirtySyncAfterSettle() {
                 dirtyLastChangeAt = Date.now();
                 clearTimeout(dirtySettleTimer);
+                setSaveStatus('Save detected', true);
                 dirtySettleTimer = setTimeout(function () {
                     if (!started) return;
                     // If a burst is still active, queue one more pass after it settles.
