@@ -318,40 +318,6 @@
                 return ('00000000' + h.toString(16)).slice(-8);
             }
 
-            function blankLikeRatio(bytes) {
-                if (!bytes || !bytes.length) return 1;
-                var maxSamples = 4096;
-                var step = Math.max(1, Math.floor(bytes.length / maxSamples));
-                var first = bytes[0];
-                var zeros = 0;
-                var ffs = 0;
-                var firstMatches = 0;
-                var samples = 0;
-                for (var i = 0; i < bytes.length; i += step) {
-                    var b = bytes[i];
-                    samples++;
-                    if (b === 0) zeros++;
-                    if (b === 255) ffs++;
-                    if (b === first) firstMatches++;
-                }
-                var dominant = Math.max(zeros, ffs, firstMatches);
-                return dominant / Math.max(1, samples);
-            }
-
-            function isLikelyBlankSave(bytes) {
-                return blankLikeRatio(bytes) >= 0.93;
-            }
-
-            function shouldPreferOlderNonBlank(newer, older) {
-                if (!newer || !older || !newer.bytes || !older.bytes) return false;
-                var newerBlank = isLikelyBlankSave(newer.bytes);
-                var olderBlank = isLikelyBlankSave(older.bytes);
-                if (!newerBlank || olderBlank) return false;
-                var newerRev = newer.revision || 0;
-                var olderRev = older.revision || 0;
-                return Math.abs(newerRev - olderRev) <= 6;
-            }
-
             function decodeStoredBytes(raw) {
                 if (!raw) return null;
                 try {
@@ -406,15 +372,9 @@
                 if (!a) return b || null;
                 if (!b) return a;
                 if ((a.revision || 0) !== (b.revision || 0)) {
-                    var newerByRev = (a.revision || 0) > (b.revision || 0) ? a : b;
-                    var olderByRev = newerByRev === a ? b : a;
-                    if (shouldPreferOlderNonBlank(newerByRev, olderByRev)) return olderByRev;
-                    return newerByRev;
+                    return (a.revision || 0) > (b.revision || 0) ? a : b;
                 }
-                var newerByTime = (a.timestamp || 0) >= (b.timestamp || 0) ? a : b;
-                var olderByTime = newerByTime === a ? b : a;
-                if (shouldPreferOlderNonBlank(newerByTime, olderByTime)) return olderByTime;
-                return newerByTime;
+                return (a.timestamp || 0) >= (b.timestamp || 0) ? a : b;
             }
 
             function readLegacyEntry() {
@@ -556,19 +516,16 @@
                         clearInterval(tryGet);
                         gm = window.EJS_emulator.gameManager;
                         started = true;
-                        // Always run a runtime restore pass; pre-boot FS restore can still miss ROM boot timing.
-                        if (!runtimeRestoreTried) {
+                        // Runtime fallback only if pre-boot restore didn't apply.
+                        if (!prebootRestoreDone && !runtimeRestoreTried) {
                             runtimeRestoreTried = true;
-                            setTimeout(function () {
-                                restoreFromLocalStorage();
-                            }, 150);
                             setTimeout(function () {
                                 restoreFromLocalStorage();
                             }, 900);
                         }
                         if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
                         autoSaveIntervalId = setInterval(function () {
-                            saveToLocalStorage(null, 'autosave-interval');
+                            saveToLocalStorage();
                         }, 30000);
                     } else if (getAttempts > 300) {
                         clearInterval(tryGet);
@@ -727,7 +684,7 @@
                         release(3, 13);
                         saveToLocalStorage(function () {
                             window.location.href = "index.html";
-                        }, 'manual-exit');
+                        });
                     }
                 }, SUPER_LONG_MS);
             });
@@ -773,12 +730,12 @@
                 var ok = false;
                 var snap = readSramSnapshot();
                 if (snap && snap.length >= 64) {
-                    ok = storeSaveBytes(canonicalSavePath(), snap, { source: 'close-checkpoint' });
+                    ok = storeSaveBytes(canonicalSavePath(), snap);
                 }
 
                 // If SRAM snapshot is unavailable, fall back to queued FS-based save.
                 if (!ok) {
-                    saveToLocalStorage(null, 'close-fs-sync');
+                    saveToLocalStorage();
                 }
             }
 
@@ -791,21 +748,11 @@
             });
             window.addEventListener('freeze', checkpointOnClose, true);
 
-            function storeSaveBytes(fullPath, data, options) {
+            function storeSaveBytes(fullPath, data) {
                 if (!data || !data.length) return false;
                 try {
                     var arr = new Uint8Array(data);
                     if (arr.length < 64) return false;
-                    var source = (options && options.source) || 'unknown';
-
-                    // Protect last-known-good save from blank-like close snapshots.
-                    if (source === 'close-checkpoint' && isLikelyBlankSave(arr)) {
-                        var current = readBestStoredSave();
-                        if (current && current.bytes && !isLikelyBlankSave(current.bytes)) {
-                            return false;
-                        }
-                    }
-
                     var path = sanitizeSavePath(fullPath || canonicalSavePath());
                     var payload = encodeBytesToBase64(arr);
                     var check = checksumHex(arr);
@@ -822,7 +769,6 @@
                         byteLength: arr.length,
                         checksum: check,
                         path: path,
-                        source: source,
                     };
 
                     // Two-phase commit: write slot payload+meta first, then flip head pointer.
@@ -841,11 +787,9 @@
                 } catch(e) { return false; }
             }
 
-            function performSaveToLocalStorage(sourceTag) {
+            function performSaveToLocalStorage() {
                 return new Promise(function (resolve) {
                     if (!gm || !gm.FS) { resolve(false); return; }
-
-                    var source = sourceTag || 'fs-sync';
 
                     function readFS() {
                         var ok = false;
@@ -858,7 +802,7 @@
                             try {
                                 var d0 = gm.FS.readFile(candidates[c]);
                                 if (d0 && d0.length >= 64) {
-                                    ok = storeSaveBytes(candidates[c], d0, { source: source });
+                                    ok = storeSaveBytes(candidates[c], d0);
                                     if (ok) break;
                                 }
                             } catch (e) {}
@@ -887,7 +831,7 @@
                                     }
                                 } catch(e) {}
                             }
-                            if (best) ok = storeSaveBytes(best.path, best.data, { source: source });
+                            if (best) ok = storeSaveBytes(best.path, best.data);
                         } catch(e) {}
 
                         resolve(ok);
@@ -908,10 +852,9 @@
                 });
             }
 
-            function saveToLocalStorage(callback, sourceTag) {
-                var source = sourceTag || 'fs-sync';
+            function saveToLocalStorage(callback) {
                 saveQueue = saveQueue
-                    .then(function () { return performSaveToLocalStorage(source); })
+                    .then(function () { return performSaveToLocalStorage(); })
                     .catch(function () { return false; });
                 if (callback) {
                     saveQueue.then(function (ok) { callback(!!ok); });
