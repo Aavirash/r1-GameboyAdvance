@@ -161,9 +161,17 @@
                 width: 36px;
                 height: 36px;
             }
-            #save-exit {
+            #gp-r {
                 top: 0;
                 right: 202px;
+                width: 28px;
+                height: 28px;
+                background: rgba(0,0,0,0.4);
+                border: 1px solid rgba(255,255,255,0.25);
+            }
+            #gp-l {
+                top: 0;
+                right: 10px;
                 width: 28px;
                 height: 28px;
                 background: rgba(0,0,0,0.4);
@@ -182,7 +190,8 @@
             <div id="gp-right" class="gp-btn" data-btn="7" data-kc="39">▶</div>
             <div id="gp-a" class="gp-btn" data-btn="8" data-kc="90">A</div>
             <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
-            <div id="save-exit" class="gp-btn">S</div>
+            <div id="gp-l" class="gp-btn" data-btn="10" data-kc="81">L</div>
+            <div id="gp-r" class="gp-btn" data-btn="11" data-kc="87">R</div>
         </div>
 
         <script>
@@ -376,6 +385,8 @@
                     {
                         90: "z",
                         88: "x",
+                        87: "w",
+                        81: "q",
                         13: "Enter",
                         16: "Shift",
                         37: "ArrowLeft",
@@ -575,23 +586,6 @@
                     setTimeout(readFS, 2000);
                 }
             }
-
-            document.getElementById("save-exit").addEventListener("click", function () {
-                this.textContent = "…";
-                this.style.pointerEvents = "none";
-                saveToLocalStorage(function (ok) {
-                    if (!ok) {
-                        // Retry once for edge cases immediately after in-game overwrite.
-                        setTimeout(function () {
-                            saveToLocalStorage(function () {
-                                window.location.href = "index.html";
-                            });
-                        }, 600);
-                        return;
-                    }
-                    window.location.href = "index.html";
-                });
-            });
 
             var scrollTimer = null,
                 scrollDir = null;
