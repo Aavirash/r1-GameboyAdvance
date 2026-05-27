@@ -361,10 +361,13 @@
                 saveStatusHideTimer = null,
                 dirtyPollTimer = null,
                 dirtyBurstTimers = [],
+                dirtySettleTimer = null,
                 dirtyLastFingerprint = null,
+                dirtyLastChangeAt = 0,
                 dirtySyncGeneration = 0,
                 dirtySyncStartAt = 0,
                 dirtySyncSettled = true,
+                dirtySyncRestartPending = false,
                 closeSaveLastAt = 0,
                 lastSaveRequestAt = 0;
 
@@ -461,6 +464,20 @@
                 dirtyBurstTimers = [];
             }
 
+            function scheduleDirtySyncAfterSettle() {
+                dirtyLastChangeAt = Date.now();
+                clearTimeout(dirtySettleTimer);
+                dirtySettleTimer = setTimeout(function () {
+                    if (!started) return;
+                    // If a burst is still active, queue one more pass after it settles.
+                    if (!dirtySyncSettled) {
+                        dirtySyncRestartPending = true;
+                        return;
+                    }
+                    startDirtySyncBurst();
+                }, 1500);
+            }
+
             function finishDirtySync(gen, ok) {
                 if (gen !== dirtySyncGeneration || dirtySyncSettled) return;
                 dirtySyncSettled = true;
@@ -470,6 +487,10 @@
                     setSaveStatus('Safe to Exit', false, 2400);
                 } else {
                     setSaveStatus('Save pending', false, 2400);
+                }
+                if (dirtySyncRestartPending) {
+                    dirtySyncRestartPending = false;
+                    scheduleDirtySyncAfterSettle();
                 }
             }
 
@@ -515,7 +536,7 @@
                     }
                     if (next !== dirtyLastFingerprint) {
                         dirtyLastFingerprint = next;
-                        startDirtySyncBurst();
+                        scheduleDirtySyncAfterSettle();
                     }
                 }, 500);
             }
