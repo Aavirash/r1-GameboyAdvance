@@ -322,6 +322,49 @@
                 } catch(e) { return false; }
             }
 
+            function layoutGameContainer() {
+                var game = document.getElementById('game');
+                if (!game) return;
+                var vw = window.innerWidth || 240;
+                var vh = window.innerHeight || 282;
+                var w = vh;
+                var h = vw;
+                game.style.setProperty('width', w + 'px', 'important');
+                game.style.setProperty('height', h + 'px', 'important');
+                game.style.left = ((vw - w) / 2) + 'px';
+                game.style.top = ((vh - h) / 2) + 'px';
+            }
+
+            function applyGameCanvasFit() {
+                var cvs = document.querySelector('#game canvas');
+                if (!cvs) return false;
+                cvs.style.width = '100%';
+                cvs.style.height = '100%';
+                cvs.style.minWidth = '100%';
+                cvs.style.minHeight = '100%';
+                // "fill" = full screen with no crop; this may stretch slightly.
+                cvs.style.objectFit = 'fill';
+                var p = cvs.parentElement;
+                while (p && p.id !== 'game') {
+                    p.style.width = '100%';
+                    p.style.height = '100%';
+                    p.style.minWidth = '100%';
+                    p.style.minHeight = '100%';
+                    p.style.margin = '0';
+                    p.style.padding = '0';
+                    p.style.border = 'none';
+                    p.style.overflow = 'hidden';
+                    p = p.parentElement;
+                }
+                return true;
+            }
+
+            layoutGameContainer();
+            window.addEventListener('resize', function () {
+                layoutGameContainer();
+                applyGameCanvasFit();
+            });
+
             EJS_ready = function () {
                 var tryReady = setInterval(function () {
                     if (window.EJS_emulator) {
@@ -349,27 +392,28 @@
                         setInterval(saveToLocalStorage, 30000);
                     }
                 }, 300);
-                setTimeout(function () {
-                    var cvs = document.querySelector("#game canvas");
-                    if (!cvs) return;
-                    cvs.style.width = "100%";
-                    cvs.style.height = "100%";
-                    cvs.style.minWidth = "100%";
-                    cvs.style.minHeight = "100%";
-                    cvs.style.objectFit = "fill";
-                    var p = cvs.parentElement;
-                    while (p && p.id !== "game") {
-                        p.style.width = "100%";
-                        p.style.height = "100%";
-                        p.style.minWidth = "100%";
-                        p.style.minHeight = "100%";
-                        p.style.margin = "0";
-                        p.style.padding = "0";
-                        p.style.border = "none";
-                        p.style.overflow = "hidden";
-                        p = p.parentElement;
+
+                // Fit reliably even when emulator canvas appears late or gets recreated.
+                var fitAttempts = 0;
+                var fitTicker = setInterval(function () {
+                    fitAttempts++;
+                    layoutGameContainer();
+                    if (applyGameCanvasFit() || fitAttempts > 120) {
+                        clearInterval(fitTicker);
                     }
-                }, 1500);
+                }, 125);
+
+                var gameEl = document.getElementById('game');
+                if (gameEl) {
+                    var fitObserver = new MutationObserver(function () {
+                        layoutGameContainer();
+                        applyGameCanvasFit();
+                    });
+                    fitObserver.observe(gameEl, { childList: true, subtree: true });
+                    setTimeout(function () {
+                        try { fitObserver.disconnect(); } catch (e) {}
+                    }, 15000);
+                }
             };
 
             function doInput(btn, keyCode, val) {
