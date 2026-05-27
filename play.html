@@ -652,7 +652,8 @@
                 sideTimer = null,
                 longHeld = false;
             var SUPER_LONG_MS = 4000,
-                superLongTimer = null;
+                superLongTimer = null,
+                lastCloseCheckpointAt = 0;
 
             window.addEventListener("sideClick", function () {
                 if (longHeld) return;
@@ -692,6 +693,60 @@
                 clearTimeout(superLongTimer);
                 release(3, 13);
             });
+
+            function readSramSnapshot() {
+                if (!gm) return null;
+                try {
+                    var M = gm.Module || (window.EJS_emulator && window.EJS_emulator.Module);
+                    if (!M || !M.HEAPU8 || !M._retro_get_memory_data || !M._retro_get_memory_size) return null;
+                    var ptr = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
+                    var size = M._retro_get_memory_size(2);
+                    if (!(ptr > 0 && size >= 64)) return null;
+
+                    var view = M.HEAPU8.subarray(ptr, ptr + size);
+                    var bytes = new Uint8Array(view);
+
+                    // Guard against uninitialized buffers that could overwrite valid saves.
+                    var first = bytes[0];
+                    var varied = false;
+                    for (var i = 1; i < bytes.length; i++) {
+                        if (bytes[i] !== first) {
+                            varied = true;
+                            break;
+                        }
+                    }
+                    if (!varied) return null;
+                    return bytes;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function checkpointOnClose() {
+                var now = Date.now();
+                if (now - lastCloseCheckpointAt < 1000) return;
+                lastCloseCheckpointAt = now;
+
+                var ok = false;
+                var snap = readSramSnapshot();
+                if (snap && snap.length >= 64) {
+                    ok = storeSaveBytes(canonicalSavePath(), snap);
+                }
+
+                // If SRAM snapshot is unavailable, fall back to queued FS-based save.
+                if (!ok) {
+                    saveToLocalStorage();
+                }
+            }
+
+            window.addEventListener('pagehide', checkpointOnClose, true);
+            window.addEventListener('beforeunload', checkpointOnClose, true);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'hidden') {
+                    checkpointOnClose();
+                }
+            });
+            window.addEventListener('freeze', checkpointOnClose, true);
 
             function storeSaveBytes(fullPath, data) {
                 if (!data || !data.length) return false;
