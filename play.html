@@ -342,36 +342,6 @@
                 return blankLikeRatio(bytes) >= 0.93;
             }
 
-            function getExpectedSaveSize() {
-                try {
-                    var M = (gm && gm.Module) || (window.EJS_emulator && window.EJS_emulator.Module);
-                    if (!M || !M._retro_get_memory_size) return 0;
-                    var size = M._retro_get_memory_size(2); // RETRO_MEMORY_SAVE_RAM
-                    return size > 0 ? size : 0;
-                } catch (e) {
-                    return 0;
-                }
-            }
-
-            function isLengthPlausible(length, baselineLength, expectedSize) {
-                if (!(length > 0)) return false;
-                var hardMin = 512;
-                if (length < hardMin) return false;
-
-                if (baselineLength > 0) {
-                    var minVsBaseline = Math.max(hardMin, Math.floor(baselineLength * 0.75));
-                    if (length < minVsBaseline) return false;
-                }
-
-                if (expectedSize > 0) {
-                    var minVsExpected = Math.max(hardMin, Math.floor(expectedSize * 0.75));
-                    if (length < minVsExpected) return false;
-                    if (length > expectedSize * 2) return false;
-                }
-
-                return true;
-            }
-
             function shouldPreferOlderNonBlank(newer, older) {
                 if (!newer || !older || !newer.bytes || !older.bytes) return false;
                 var newerBlank = isLikelyBlankSave(newer.bytes);
@@ -496,12 +466,6 @@
                                 var size = M._retro_get_memory_size(2);
                                 if (ptr > 0 && size > 0) {
                                     var len = Math.min(bytes.length, size);
-                                    // Clear target region first to avoid stale tail bytes when source is shorter.
-                                    if (typeof M.HEAPU8.fill === 'function') {
-                                        M.HEAPU8.fill(0, ptr, ptr + size);
-                                    } else {
-                                        for (var z = 0; z < size; z++) M.HEAPU8[ptr + z] = 0;
-                                    }
                                     for (var k = 0; k < len; k++) M.HEAPU8[ptr + k] = bytes[k];
                                     sramDone = true;
                                 }
@@ -827,22 +791,9 @@
                     if (arr.length < 64) return false;
                     var source = (options && options.source) || 'unknown';
 
-                    var current = readBestStoredSave();
-                    var currentBytes = current && current.bytes ? current.bytes : null;
-                    var currentLen = currentBytes ? currentBytes.length : 0;
-                    var expectedSize = getExpectedSaveSize();
-
-                    if (!isLengthPlausible(arr.length, currentLen, expectedSize)) {
-                        return false;
-                    }
-
-                    // Never replace a known non-blank committed save with a blank-like candidate.
-                    if (currentBytes && currentBytes.length && !isLikelyBlankSave(currentBytes) && isLikelyBlankSave(arr)) {
-                        return false;
-                    }
-
                     // Protect last-known-good save from blank-like close snapshots.
                     if (source === 'close-checkpoint' && isLikelyBlankSave(arr)) {
+                        var current = readBestStoredSave();
                         if (current && current.bytes && !isLikelyBlankSave(current.bytes)) {
                             return false;
                         }
@@ -889,126 +840,63 @@
 
                     var source = sourceTag || 'fs-sync';
 
-                    function currentSnapshot() {
-                        var current = readBestStoredSave();
-                        return current && current.bytes ? current.bytes : null;
-                    }
-
-                    function isSafeCandidate(bytes, baselineBytes, expectedSize) {
-                        if (!bytes || !bytes.length) return false;
-                        var baselineLen = baselineBytes ? baselineBytes.length : 0;
-                        if (!isLengthPlausible(bytes.length, baselineLen, expectedSize)) return false;
-                        if (baselineBytes && baselineBytes.length && !isLikelyBlankSave(baselineBytes) && isLikelyBlankSave(bytes)) {
-                            return false;
-                        }
-                        return true;
-                    }
-
-                    function tryStablePath(path, baselineBytes, expectedSize, done) {
-                        var first;
-                        try {
-                            first = gm.FS.readFile(path);
-                        } catch (e) {
-                            done(false);
-                            return;
-                        }
-                        if (!first || !first.length) {
-                            done(false);
-                            return;
-                        }
-
-                        var firstArr = new Uint8Array(first);
-                        if (!isSafeCandidate(firstArr, baselineBytes, expectedSize)) {
-                            done(false);
-                            return;
-                        }
-                        var firstHash = checksumHex(firstArr);
-
-                        // Verify file is stable across two reads to avoid committing mid-write bytes.
-                        setTimeout(function () {
-                            try {
-                                var second = gm.FS.readFile(path);
-                                if (!second || !second.length) { done(false); return; }
-                                var secondArr = new Uint8Array(second);
-                                if (secondArr.length !== firstArr.length) { done(false); return; }
-                                if (checksumHex(secondArr) !== firstHash) { done(false); return; }
-                                if (!isSafeCandidate(secondArr, baselineBytes, expectedSize)) { done(false); return; }
-                                done(storeSaveBytes(path, secondArr, { source: source }));
-                            } catch (e) {
-                                done(false);
-                            }
-                        }, 220);
-                    }
-
-                    function tryPaths(paths, idx, baselineBytes, expectedSize, done) {
-                        if (idx >= paths.length) {
-                            done(false);
-                            return;
-                        }
-                        tryStablePath(paths[idx], baselineBytes, expectedSize, function (ok) {
-                            if (ok) {
-                                done(true);
-                                return;
-                            }
-                            tryPaths(paths, idx + 1, baselineBytes, expectedSize, done);
-                        });
-                    }
-
                     function readFS() {
+                        var ok = false;
                         var canonical = canonicalSavePath();
                         var legacyPath = sanitizeSavePath(localStorage.getItem(legacyPathKey()) || canonical);
                         var candidates = [canonical, '/data/saves/' + EJS_gameName + '.sav'];
                         if (legacyPath !== canonical) candidates.push(legacyPath);
 
-                        var baselineBytes = currentSnapshot();
-                        var expectedSize = getExpectedSaveSize();
-
-                        tryPaths(candidates, 0, baselineBytes, expectedSize, function (okPrimary) {
-                            if (okPrimary) {
-                                resolve(true);
-                                return;
-                            }
-
-                            // Restricted fallback: same ROM name only, then choose largest valid match.
+                        for (var c = 0; c < candidates.length; c++) {
                             try {
-                                var files = gm.FS.readdir('/data/saves/');
-                                var target = normalizeName(EJS_gameName);
-                                var scored = [];
-                                for (var i = 0; i < files.length; i++) {
-                                    var f = files[i];
-                                    if (f === '.' || f === '..' || f === 'Auto.cache') continue;
-                                    if (normalizeName(f).indexOf(target) === -1) continue;
-                                    var path = '/data/saves/' + f;
-                                    try {
-                                        var fd = gm.FS.readFile(path);
-                                        if (!fd || !fd.length) continue;
-                                        var fdArr = new Uint8Array(fd);
-                                        if (!isSafeCandidate(fdArr, baselineBytes, expectedSize)) continue;
-                                        scored.push({ path: path, size: fdArr.length });
-                                    } catch (e2) {}
+                                var d0 = gm.FS.readFile(candidates[c]);
+                                if (d0 && d0.length >= 64) {
+                                    ok = storeSaveBytes(candidates[c], d0, { source: source });
+                                    if (ok) break;
                                 }
-                                scored.sort(function (a, b) { return b.size - a.size; });
-                                var fallbackPaths = scored.map(function (x) { return x.path; });
-                                tryPaths(fallbackPaths, 0, baselineBytes, expectedSize, function (okFallback) {
-                                    resolve(!!okFallback);
-                                });
-                            } catch (e) {
-                                resolve(false);
+                            } catch (e) {}
+                        }
+
+                        if (ok) {
+                            resolve(true);
+                            return;
+                        }
+
+                        // Restricted fallback: same ROM name only, then choose largest valid match.
+                        try {
+                            var files = gm.FS.readdir('/data/saves/');
+                            var best = null;
+                            var bestSize = 0;
+                            var target = normalizeName(EJS_gameName);
+                            for (var i = 0; i < files.length; i++) {
+                                var f = files[i];
+                                if (f === '.' || f === '..' || f === 'Auto.cache') continue;
+                                if (normalizeName(f).indexOf(target) === -1) continue;
+                                try {
+                                    var fd = gm.FS.readFile('/data/saves/' + f);
+                                    if (fd && fd.length >= 64 && fd.length > bestSize) {
+                                        best = { path: '/data/saves/' + f, data: fd };
+                                        bestSize = fd.length;
+                                    }
+                                } catch(e) {}
                             }
-                        });
+                            if (best) ok = storeSaveBytes(best.path, best.data, { source: source });
+                        } catch(e) {}
+
+                        resolve(ok);
                     }
 
                     try {
                         var p = gm.saveSaveFiles();
                         if (p && typeof p.then === 'function') {
                             // Extra flush headroom to avoid reading stale pre-overwrite bytes.
-                            p.then(function () { setTimeout(readFS, 2000); })
-                             .catch(function () { setTimeout(readFS, 3200); });
+                            p.then(function () { setTimeout(readFS, 1200); })
+                             .catch(function () { setTimeout(readFS, 2200); });
                         } else {
-                            setTimeout(readFS, 3200);
+                            setTimeout(readFS, 2200);
                         }
                     } catch(e) {
-                        setTimeout(readFS, 3200);
+                        setTimeout(readFS, 2200);
                     }
                 });
             }
