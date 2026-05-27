@@ -314,7 +314,11 @@
                 saveStatusTextEl = null,
                 saveStatusHideTimer = null,
                 dirtyPollTimer = null,
+                dirtyBurstTimers = [],
                 dirtyLastFingerprint = null,
+                dirtySyncGeneration = 0,
+                dirtySyncStartAt = 0,
+                dirtySyncSettled = true,
                 closeSaveLastAt = 0,
                 lastSaveRequestAt = 0;
 
@@ -372,6 +376,52 @@
                 }
             }
 
+            function clearDirtyBurstTimers() {
+                for (var i = 0; i < dirtyBurstTimers.length; i++) {
+                    clearTimeout(dirtyBurstTimers[i]);
+                }
+                dirtyBurstTimers = [];
+            }
+
+            function finishDirtySync(gen, ok) {
+                if (gen !== dirtySyncGeneration || dirtySyncSettled) return;
+                dirtySyncSettled = true;
+                clearDirtyBurstTimers();
+                if (ok) {
+                    setSaveStatus('Safe to Exit', false, 2400);
+                } else {
+                    setSaveStatus('Save pending', false, 2400);
+                }
+            }
+
+            function startDirtySyncBurst() {
+                dirtySyncGeneration++;
+                var gen = dirtySyncGeneration;
+                dirtySyncSettled = false;
+                dirtySyncStartAt = Date.now();
+                clearDirtyBurstTimers();
+                setSaveStatus('Saving...', true);
+
+                var schedule = [0, 1200, 2800, 5200, 8200, 12000];
+                for (var i = 0; i < schedule.length; i++) {
+                    (function (idx) {
+                        dirtyBurstTimers.push(setTimeout(function () {
+                            queueSave('dirty-burst', function (ok) {
+                                if (gen !== dirtySyncGeneration || dirtySyncSettled) return;
+                                var elapsed = Date.now() - dirtySyncStartAt;
+                                if (ok && elapsed >= 3200) {
+                                    finishDirtySync(gen, true);
+                                    return;
+                                }
+                                if (idx === schedule.length - 1) {
+                                    finishDirtySync(gen, !!ok);
+                                }
+                            });
+                        }, schedule[idx]));
+                    })(i);
+                }
+            }
+
             function startDirtyWatcher() {
                 if (dirtyPollTimer) clearInterval(dirtyPollTimer);
                 dirtyLastFingerprint = getSaveRamFingerprint();
@@ -385,19 +435,20 @@
                     }
                     if (next !== dirtyLastFingerprint) {
                         dirtyLastFingerprint = next;
-                        queueSave('dirty-change');
+                        startDirtySyncBurst();
                     }
-                }, 3000);
+                }, 1000);
             }
 
             function queueSave(reason, callback) {
+                reason = reason || 'autosave';
                 var now = Date.now();
-                if (reason === 'dirty-change' && now - lastSaveRequestAt < 8000) {
+                if (reason === 'dirty-burst' && now - lastSaveRequestAt < 900) {
                     if (callback) callback(false);
                     return;
                 }
                 lastSaveRequestAt = now;
-                saveToLocalStorage(callback, reason || 'autosave');
+                saveToLocalStorage(callback, reason);
             }
 
             function bestEffortCloseSave() {
@@ -535,7 +586,7 @@
                         if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
                         autoSaveIntervalId = setInterval(function () {
                             queueSave('autosave-interval');
-                        }, 10000);
+                        }, 8000);
                         setTimeout(function () {
                             dirtyLastFingerprint = getSaveRamFingerprint() || dirtyLastFingerprint;
                         }, 1300);
@@ -824,7 +875,11 @@
 
             function saveToLocalStorage(callback, reason) {
                 reason = reason || 'autosave';
-                setSaveStatus('Saving...', true);
+                var suppressProgress = (reason === 'autosave-interval' || reason === 'close-event');
+                var suppressFinal = (reason === 'dirty-burst' || suppressProgress);
+                if (!suppressProgress) {
+                    setSaveStatus('Saving...', true);
+                }
                 saveQueue = saveQueue
                     .then(function () {
                         return new Promise(function (resolve) {
@@ -838,10 +893,12 @@
                     });
 
                 saveQueue.then(function (ok) {
-                    if (ok) {
-                        setSaveStatus('Saved', false, 1500);
-                    } else {
-                        setSaveStatus('Save pending', false, 2000);
+                    if (!suppressFinal) {
+                        if (ok) {
+                            setSaveStatus('Safe to Exit', false, 1800);
+                        } else {
+                            setSaveStatus('Save pending', false, 2000);
+                        }
                     }
                     if (callback) callback(!!ok);
                 });
