@@ -235,6 +235,9 @@
                 opacity: 1;
                 pointer-events: auto;
             }
+            #save-overlay.done #save-overlay-spinner {
+                display: none;
+            }
             #save-overlay-card {
                 display: flex;
                 align-items: center;
@@ -343,10 +346,10 @@
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency",      default: "256",  isString: false },
+                { name: "audio_latency",      default: "320",  isString: false },
                 { name: "audio_rate_control", default: "true", isString: false },
-                { name: "audio_rate_control_delta", default: "0.0015", isString: false },
-                { name: "audio_resampler",    default: "sinc", isString: true  },
+                { name: "audio_rate_control_delta", default: "0.0008", isString: false },
+                { name: "audio_resampler",    default: "nearest", isString: true  },
                 { name: "video_threaded",     default: "true"                   },
                 { name: "video_vsync",        default: "false", isString: false },
             ];
@@ -387,15 +390,18 @@
                 if (!saveOverlayTextEl) saveOverlayTextEl = document.getElementById('save-overlay-text');
             }
 
-            function setSaveOverlay(show, text) {
+            function setSaveOverlay(show, text, done) {
                 ensureSaveStatus();
                 if (!saveOverlayEl || !saveOverlayTextEl) return;
                 if (text) saveOverlayTextEl.textContent = text;
                 if (show) {
+                    if (done) saveOverlayEl.classList.add('done');
+                    else saveOverlayEl.classList.remove('done');
                     saveOverlayEl.classList.add('show');
                     saveOverlayEl.setAttribute('aria-hidden', 'false');
                 } else {
                     saveOverlayEl.classList.remove('show');
+                    saveOverlayEl.classList.remove('done');
                     saveOverlayEl.setAttribute('aria-hidden', 'true');
                 }
             }
@@ -427,7 +433,8 @@
                     var size = M._retro_get_memory_size(2);
                     if (!(ptr > 0 && size >= 64)) return null;
                     var h = 2166136261 >>> 0;
-                    for (var i = 0; i < size; i++) {
+                    var step = Math.max(1, Math.floor(size / 1024));
+                    for (var i = 0; i < size; i += step) {
                         h ^= M.HEAPU8[ptr + i];
                         h = Math.imul(h, 16777619) >>> 0;
                     }
@@ -480,10 +487,13 @@
                 if (gen !== dirtySyncGeneration || dirtySyncSettled) return;
                 dirtySyncSettled = true;
                 clearDirtyBurstTimers();
-                setSaveOverlay(false);
                 if (ok) {
-                    setSaveStatus('Safe to Exit', false, 2400);
+                    setSaveOverlay(true, 'Safe to Exit', true);
+                    setTimeout(function () {
+                        setSaveOverlay(false);
+                    }, 1800);
                 } else {
+                    setSaveOverlay(false);
                     setSaveStatus('Save pending', false, 2400);
                 }
             }
@@ -532,7 +542,7 @@
                         dirtyLastFingerprint = next;
                         scheduleDirtySyncAfterSettle();
                     }
-                }, 500);
+                }, 1000);
             }
 
             function queueSave(reason, callback) {
@@ -681,7 +691,7 @@
                         if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
                         autoSaveIntervalId = setInterval(function () {
                             queueSave('autosave-interval');
-                        }, 8000);
+                        }, 12000);
                         setTimeout(function () {
                             dirtyLastFingerprint = getSaveRamFingerprint() || getFsSaveFingerprint() || dirtyLastFingerprint;
                         }, 1300);
