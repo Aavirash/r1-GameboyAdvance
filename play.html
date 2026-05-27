@@ -347,10 +347,10 @@
                 'vsync': 'disabled',
             };
             EJS_retroarchOpts = [
-                { name: "audio_latency",      default: "320",  isString: false },
+                { name: "audio_latency",      default: "384",  isString: false },
                 { name: "audio_rate_control", default: "true", isString: false },
-                { name: "audio_rate_control_delta", default: "0.0008", isString: false },
-                { name: "audio_resampler",    default: "nearest", isString: true  },
+                { name: "audio_rate_control_delta", default: "0.0005", isString: false },
+                { name: "audio_resampler",    default: "linear", isString: true  },
                 { name: "video_threaded",     default: "true"                   },
                 { name: "video_vsync",        default: "false", isString: false },
             ];
@@ -529,7 +529,7 @@
                         dirtyLastFingerprint = next;
                         scheduleDirtySyncAfterSettle();
                     }
-                }, 1000);
+                }, 1500);
             }
 
             function queueSave(reason, callback) {
@@ -678,7 +678,7 @@
                         if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
                         autoSaveIntervalId = setInterval(function () {
                             queueSave('autosave-interval');
-                        }, 12000);
+                        }, 20000);
                         setTimeout(function () {
                             dirtyLastFingerprint = getSaveRamFingerprint() || getFsSaveFingerprint() || dirtyLastFingerprint;
                         }, 1300);
@@ -1043,7 +1043,7 @@
             window.addEventListener('scrollUp', tryResumeCtx);
             window.addEventListener('scrollDown', tryResumeCtx);
             // Keep AudioContext alive during play — Android can suspend it mid-game
-            setInterval(tryResumeCtx, 5000);
+            setInterval(tryResumeCtx, 10000);
             document.addEventListener('visibilitychange', function () {
                 if (!document.hidden) tryResumeCtx();
             });
