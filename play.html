@@ -262,25 +262,156 @@
             ];
 
             var gm = null,
-                started = false;
+                started = false,
+                prebootRestoreDone = false,
+                runtimeRestoreTried = false,
+                autoSaveIntervalId = null,
+                saveQueue = Promise.resolve();
+
+            function normalizeName(v) {
+                return (v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            }
+
+            function canonicalSavePath() {
+                return '/data/saves/' + EJS_gameName + '.srm';
+            }
+
+            function legacyDataKey() {
+                return '_r1s_' + EJS_gameName;
+            }
+
+            function legacyPathKey() {
+                return '_r1s_' + EJS_gameName + '_path';
+            }
+
+            function slotDataKey(slot) {
+                return '_r1s_' + EJS_gameName + '_slot_' + slot;
+            }
+
+            function slotMetaKey(slot) {
+                return '_r1s_' + EJS_gameName + '_slot_' + slot + '_meta';
+            }
+
+            function headKey() {
+                return '_r1s_' + EJS_gameName + '_head';
+            }
+
+            function pathMatchesCurrentGame(path) {
+                var file = String(path || '').split('/').pop() || '';
+                var game = normalizeName(EJS_gameName);
+                return !!game && normalizeName(file).indexOf(game) !== -1;
+            }
+
+            function sanitizeSavePath(path) {
+                if (typeof path !== 'string') return canonicalSavePath();
+                if (path.indexOf('/data/saves/') !== 0) return canonicalSavePath();
+                if (!pathMatchesCurrentGame(path)) return canonicalSavePath();
+                return path;
+            }
+
+            function checksumHex(bytes) {
+                var h = 2166136261 >>> 0;
+                for (var i = 0; i < bytes.length; i++) {
+                    h ^= bytes[i];
+                    h = Math.imul(h, 16777619) >>> 0;
+                }
+                return ('00000000' + h.toString(16)).slice(-8);
+            }
+
+            function decodeStoredBytes(raw) {
+                if (!raw) return null;
+                try {
+                    var bin = atob(raw);
+                    var arr = new Uint8Array(bin.length);
+                    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                    return arr;
+                } catch (e) {}
+                try {
+                    var plain = JSON.parse(raw);
+                    if (!plain || typeof plain.length !== 'number') return null;
+                    var arr2 = new Uint8Array(plain.length);
+                    for (var j = 0; j < plain.length; j++) arr2[j] = plain[j];
+                    return arr2;
+                } catch (e2) {}
+                return null;
+            }
+
+            function encodeBytesToBase64(bytes) {
+                var CHUNK = 0x8000;
+                var out = '';
+                for (var i = 0; i < bytes.length; i += CHUNK) {
+                    var sub = bytes.subarray(i, i + CHUNK);
+                    out += String.fromCharCode.apply(null, sub);
+                }
+                return btoa(out);
+            }
+
+            function readSlotEntry(slot) {
+                try {
+                    var raw = localStorage.getItem(slotDataKey(slot));
+                    var metaRaw = localStorage.getItem(slotMetaKey(slot));
+                    if (!raw || !metaRaw) return null;
+                    var meta = JSON.parse(metaRaw);
+                    var bytes = decodeStoredBytes(raw);
+                    if (!bytes || !bytes.length) return null;
+                    if (meta && meta.byteLength && bytes.length !== meta.byteLength) return null;
+                    var check = checksumHex(bytes);
+                    if (meta && meta.checksum && meta.checksum !== check) return null;
+                    return {
+                        bytes: bytes,
+                        path: sanitizeSavePath(meta && meta.path),
+                        revision: (meta && meta.revision) || 0,
+                        timestamp: (meta && meta.timestamp) || 0,
+                    };
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function chooseNewer(a, b) {
+                if (!a) return b || null;
+                if (!b) return a;
+                if ((a.revision || 0) !== (b.revision || 0)) {
+                    return (a.revision || 0) > (b.revision || 0) ? a : b;
+                }
+                return (a.timestamp || 0) >= (b.timestamp || 0) ? a : b;
+            }
+
+            function readLegacyEntry() {
+                var bytes = decodeStoredBytes(localStorage.getItem(legacyDataKey()));
+                if (!bytes || !bytes.length) return null;
+                return {
+                    bytes: bytes,
+                    path: sanitizeSavePath(localStorage.getItem(legacyPathKey()) || canonicalSavePath()),
+                    revision: 0,
+                    timestamp: 0,
+                };
+            }
+
+            function readBestStoredSave() {
+                try {
+                    var headRaw = localStorage.getItem(headKey());
+                    if (headRaw) {
+                        var head = JSON.parse(headRaw);
+                        var active = head && head.activeSlot === 'b' ? 'b' : 'a';
+                        var primary = readSlotEntry(active);
+                        var secondary = readSlotEntry(active === 'a' ? 'b' : 'a');
+                        var chosen = chooseNewer(primary, secondary);
+                        if (chosen) return chosen;
+                    }
+                } catch (e) {}
+                var a = readSlotEntry('a');
+                var b = readSlotEntry('b');
+                var best = chooseNewer(a, b);
+                if (best) return best;
+                return readLegacyEntry();
+            }
 
             function restoreFromLocalStorage(fsOverride) {
                 try {
-                    var saved = localStorage.getItem('_r1s_' + EJS_gameName);
-                    if (!saved) return false;
-                    var bytes;
-                    try {
-                        var bin = atob(saved);
-                        bytes = new Uint8Array(bin.length);
-                        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-                    } catch(e) {
-                        try {
-                            var plain = JSON.parse(saved);
-                            bytes = new Uint8Array(plain.length);
-                            for (var j = 0; j < plain.length; j++) bytes[j] = plain[j];
-                        } catch(e2) { return false; }
-                    }
-                    if (!bytes || !bytes.length) return false;
+                    var entry = readBestStoredSave();
+                    if (!entry || !entry.bytes || !entry.bytes.length) return false;
+                    var bytes = entry.bytes;
 
                     var fs = fsOverride || (gm && gm.FS);
                     if (!fs) return false;
@@ -303,21 +434,12 @@
                     }
 
                     // Method 2: write to FS — always do this so saveSaveFiles() flushes correct data
-                    var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
-                                   ('/data/saves/' + EJS_gameName + '.srm');
+                    var savePath = sanitizeSavePath(entry.path || canonicalSavePath());
                     try { fs.mkdir('/data'); } catch(e) {}
                     try { fs.mkdir('/data/saves'); } catch(e) {}
                     try { fs.writeFile(savePath, bytes); } catch(e) {}
 
                     if (fsOverride) return true;
-
-                    // Only call loadSaveFiles if direct SRAM write failed
-                    // (loadSaveFiles does IndexedDB sync that can race with startSaveInterval)
-                    if (!sramDone) {
-                        setTimeout(function () {
-                            try { gm.loadSaveFiles(); } catch(e) {}
-                        }, 300);
-                    }
                     return true;
                 } catch(e) { return false; }
             }
@@ -366,30 +488,47 @@
             });
 
             EJS_ready = function () {
+                var readyAttempts = 0;
                 var tryReady = setInterval(function () {
+                    readyAttempts++;
                     if (window.EJS_emulator) {
                         clearInterval(tryReady);
                         try { window.EJS_emulator.startSaveInterval(10000); } catch(e) {}
                         try {
                             window.EJS_emulator.on('saveDatabaseLoaded', function (FS) {
                                 // Pre-boot restore so games detect save on first open.
-                                restoreFromLocalStorage(FS);
+                                if (!prebootRestoreDone) {
+                                    prebootRestoreDone = restoreFromLocalStorage(FS) || prebootRestoreDone;
+                                }
                             });
                         } catch (e) {}
+                    } else if (readyAttempts > 180) {
+                        clearInterval(tryReady);
                     }
                 }, 200);
             };
 
             EJS_onGameStart = function () {
+                var getAttempts = 0;
                 var tryGet = setInterval(function () {
+                    getAttempts++;
                     if (window.EJS_emulator && window.EJS_emulator.gameManager) {
                         clearInterval(tryGet);
                         gm = window.EJS_emulator.gameManager;
                         started = true;
-                        // Restore save from localStorage
-                        setTimeout(restoreFromLocalStorage, 800);
-                        // Auto-save every 30s
-                        setInterval(saveToLocalStorage, 30000);
+                        // Runtime fallback only if pre-boot restore didn't apply.
+                        if (!prebootRestoreDone && !runtimeRestoreTried) {
+                            runtimeRestoreTried = true;
+                            setTimeout(function () {
+                                restoreFromLocalStorage();
+                            }, 900);
+                        }
+                        if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
+                        autoSaveIntervalId = setInterval(function () {
+                            saveToLocalStorage();
+                        }, 30000);
+                    } else if (getAttempts > 300) {
+                        clearInterval(tryGet);
                     }
                 }, 300);
 
@@ -558,76 +697,112 @@
                 if (!data || !data.length) return false;
                 try {
                     var arr = new Uint8Array(data);
-                    var bin = '';
-                    for (var i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
-                    localStorage.setItem('_r1s_' + EJS_gameName, btoa(bin));
-                    localStorage.setItem('_r1s_' + EJS_gameName + '_path', fullPath);
+                    if (arr.length < 64) return false;
+                    var path = sanitizeSavePath(fullPath || canonicalSavePath());
+                    var payload = encodeBytesToBase64(arr);
+                    var check = checksumHex(arr);
+
+                    var head = null;
+                    try { head = JSON.parse(localStorage.getItem(headKey()) || 'null'); } catch (e) {}
+                    var nextSlot = (head && head.activeSlot === 'a') ? 'b' : 'a';
+                    var nextRevision = (head && typeof head.revision === 'number') ? (head.revision + 1) : 1;
+                    var now = Date.now();
+
+                    var slotMeta = {
+                        revision: nextRevision,
+                        timestamp: now,
+                        byteLength: arr.length,
+                        checksum: check,
+                        path: path,
+                    };
+
+                    // Two-phase commit: write slot payload+meta first, then flip head pointer.
+                    localStorage.setItem(slotDataKey(nextSlot), payload);
+                    localStorage.setItem(slotMetaKey(nextSlot), JSON.stringify(slotMeta));
+                    localStorage.setItem(headKey(), JSON.stringify({
+                        activeSlot: nextSlot,
+                        revision: nextRevision,
+                        timestamp: now,
+                    }));
+
+                    // Keep legacy keys for backward compatibility and rollback safety.
+                    localStorage.setItem(legacyDataKey(), payload);
+                    localStorage.setItem(legacyPathKey(), path);
                     return true;
                 } catch(e) { return false; }
             }
 
-            function saveToLocalStorage(callback) {
-                if (!gm || !gm.FS) { if (callback) callback(false); return; }
+            function performSaveToLocalStorage() {
+                return new Promise(function (resolve) {
+                    if (!gm || !gm.FS) { resolve(false); return; }
 
-                function readFS() {
-                    var ok = false;
-                    // Try expected path(s) first so overwrites stay on the same file.
-                    try {
-                        var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
-                                       ('/data/saves/' + EJS_gameName + '.srm');
-                        var candidates = [
-                            savePath,
-                            '/data/saves/' + EJS_gameName + '.srm',
-                            '/data/saves/' + EJS_gameName + '.sav'
-                        ];
+                    function readFS() {
+                        var ok = false;
+                        var canonical = canonicalSavePath();
+                        var legacyPath = sanitizeSavePath(localStorage.getItem(legacyPathKey()) || canonical);
+                        var candidates = [canonical, '/data/saves/' + EJS_gameName + '.sav'];
+                        if (legacyPath !== canonical) candidates.push(legacyPath);
+
                         for (var c = 0; c < candidates.length; c++) {
                             try {
                                 var d0 = gm.FS.readFile(candidates[c]);
                                 if (d0 && d0.length >= 64) {
                                     ok = storeSaveBytes(candidates[c], d0);
-                                    break;
+                                    if (ok) break;
                                 }
                             } catch (e) {}
                         }
-                    } catch (e) {}
 
-                    if (ok) {
-                        if (callback) callback(true);
-                        return;
-                    }
-
-                    // Read largest valid save file in /data/saves/ (not just first)
-                    try {
-                        var files = gm.FS.readdir('/data/saves/');
-                        var best = null, bestSize = 0;
-                        for (var i = 0; i < files.length; i++) {
-                            var f = files[i];
-                            if (f === '.' || f === '..' || f === 'Auto.cache') continue;
-                            try {
-                                var fd = gm.FS.readFile('/data/saves/' + f);
-                                if (fd && fd.length > bestSize && fd.length >= 64) {
-                                    best = { path: '/data/saves/' + f, data: fd };
-                                    bestSize = fd.length;
-                                }
-                            } catch(e) {}
+                        if (ok) {
+                            resolve(true);
+                            return;
                         }
-                        if (best) ok = storeSaveBytes(best.path, best.data);
-                    } catch(e) {}
-                    if (callback) callback(ok);
-                }
 
-                try {
-                    var p = gm.saveSaveFiles();
-                    if (p && typeof p.then === 'function') {
-                        // saveSaveFiles returned a Promise — wait extra for overwrite flush on R1
-                        p.then(function () { setTimeout(readFS, 900); })
-                         .catch(function () { setTimeout(readFS, 2000); });
-                    } else {
-                        // No Promise — conservative delay for R1 WASM flush
-                        setTimeout(readFS, 2000);
+                        // Restricted fallback: same ROM name only, then choose largest valid match.
+                        try {
+                            var files = gm.FS.readdir('/data/saves/');
+                            var best = null;
+                            var bestSize = 0;
+                            var target = normalizeName(EJS_gameName);
+                            for (var i = 0; i < files.length; i++) {
+                                var f = files[i];
+                                if (f === '.' || f === '..' || f === 'Auto.cache') continue;
+                                if (normalizeName(f).indexOf(target) === -1) continue;
+                                try {
+                                    var fd = gm.FS.readFile('/data/saves/' + f);
+                                    if (fd && fd.length >= 64 && fd.length > bestSize) {
+                                        best = { path: '/data/saves/' + f, data: fd };
+                                        bestSize = fd.length;
+                                    }
+                                } catch(e) {}
+                            }
+                            if (best) ok = storeSaveBytes(best.path, best.data);
+                        } catch(e) {}
+
+                        resolve(ok);
                     }
-                } catch(e) {
-                    setTimeout(readFS, 2000);
+
+                    try {
+                        var p = gm.saveSaveFiles();
+                        if (p && typeof p.then === 'function') {
+                            // Extra flush headroom to avoid reading stale pre-overwrite bytes.
+                            p.then(function () { setTimeout(readFS, 1200); })
+                             .catch(function () { setTimeout(readFS, 2200); });
+                        } else {
+                            setTimeout(readFS, 2200);
+                        }
+                    } catch(e) {
+                        setTimeout(readFS, 2200);
+                    }
+                });
+            }
+
+            function saveToLocalStorage(callback) {
+                saveQueue = saveQueue
+                    .then(function () { return performSaveToLocalStorage(); })
+                    .catch(function () { return false; });
+                if (callback) {
+                    saveQueue.then(function (ok) { callback(!!ok); });
                 }
             }
 
