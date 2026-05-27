@@ -178,6 +178,47 @@
                 border: 1px solid rgba(255,255,255,0.25);
             }
 
+            #save-status {
+                position: absolute;
+                left: 50%;
+                bottom: 8px;
+                transform: translateX(-50%);
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                padding: 2px 6px;
+                border-radius: 10px;
+                background: rgba(0, 0, 0, 0.18);
+                color: rgba(255, 255, 255, 0.42);
+                font-size: 8px;
+                letter-spacing: 0.2px;
+                opacity: 0;
+                transition: opacity 0.18s ease;
+                pointer-events: none;
+                z-index: 2147483647;
+            }
+            #save-status.show {
+                opacity: 1;
+            }
+            #save-status .save-spinner {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-top-color: rgba(255, 255, 255, 0.75);
+                animation: save-spin 0.8s linear infinite;
+                flex-shrink: 0;
+            }
+            #save-status.idle .save-spinner {
+                animation: none;
+                border-top-color: rgba(255, 255, 255, 0.3);
+            }
+            @keyframes save-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
         </style>
     </head>
     <body>
@@ -192,6 +233,10 @@
             <div id="gp-b" class="gp-btn" data-btn="0" data-kc="88">B</div>
             <div id="gp-l" class="gp-btn" data-btn="10" data-kc="81">L</div>
             <div id="gp-r" class="gp-btn" data-btn="11" data-kc="87">R</div>
+            <div id="save-status" class="idle" role="status" aria-live="polite">
+                <span class="save-spinner" aria-hidden="true"></span>
+                <span id="save-status-text">Saved</span>
+            </div>
         </div>
 
         <script>
@@ -262,7 +307,105 @@
             ];
 
             var gm = null,
-                started = false;
+                started = false,
+                autoSaveIntervalId = null,
+                saveQueue = Promise.resolve(),
+                saveStatusEl = null,
+                saveStatusTextEl = null,
+                saveStatusHideTimer = null,
+                dirtyPollTimer = null,
+                dirtyLastFingerprint = null,
+                closeSaveLastAt = 0,
+                lastSaveRequestAt = 0;
+
+            function hashBytes(bytes) {
+                var h = 2166136261 >>> 0;
+                for (var i = 0; i < bytes.length; i++) {
+                    h ^= bytes[i];
+                    h = Math.imul(h, 16777619) >>> 0;
+                }
+                return h >>> 0;
+            }
+
+            function ensureSaveStatus() {
+                if (!saveStatusEl) saveStatusEl = document.getElementById('save-status');
+                if (!saveStatusTextEl) saveStatusTextEl = document.getElementById('save-status-text');
+            }
+
+            function setSaveStatus(text, isSaving, holdMs) {
+                ensureSaveStatus();
+                if (!saveStatusEl || !saveStatusTextEl) return;
+                saveStatusTextEl.textContent = text;
+                saveStatusEl.classList.add('show');
+                if (isSaving) {
+                    saveStatusEl.classList.remove('idle');
+                } else {
+                    saveStatusEl.classList.add('idle');
+                }
+                clearTimeout(saveStatusHideTimer);
+                if (!isSaving) {
+                    saveStatusHideTimer = setTimeout(function () {
+                        if (saveStatusEl) saveStatusEl.classList.remove('show');
+                    }, holdMs || 1800);
+                }
+            }
+
+            function getSaveRamFingerprint() {
+                if (!gm) return null;
+                try {
+                    var M = gm.Module || (window.EJS_emulator && window.EJS_emulator.Module);
+                    if (!M || !M.HEAPU8 || !M._retro_get_memory_data || !M._retro_get_memory_size) return null;
+                    var ptr = M._retro_get_memory_data(2); // RETRO_MEMORY_SAVE_RAM
+                    var size = M._retro_get_memory_size(2);
+                    if (!(ptr > 0 && size >= 64)) return null;
+                    var step = Math.max(1, Math.floor(size / 192));
+                    var h = 2166136261 >>> 0;
+                    for (var i = 0; i < size; i += step) {
+                        h ^= M.HEAPU8[ptr + i];
+                        h = Math.imul(h, 16777619) >>> 0;
+                    }
+                    h ^= size;
+                    h = Math.imul(h, 16777619) >>> 0;
+                    return h.toString(16) + ':' + size;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function startDirtyWatcher() {
+                if (dirtyPollTimer) clearInterval(dirtyPollTimer);
+                dirtyLastFingerprint = getSaveRamFingerprint();
+                dirtyPollTimer = setInterval(function () {
+                    if (!started || !gm) return;
+                    var next = getSaveRamFingerprint();
+                    if (!next) return;
+                    if (!dirtyLastFingerprint) {
+                        dirtyLastFingerprint = next;
+                        return;
+                    }
+                    if (next !== dirtyLastFingerprint) {
+                        dirtyLastFingerprint = next;
+                        queueSave('dirty-change');
+                    }
+                }, 3000);
+            }
+
+            function queueSave(reason, callback) {
+                var now = Date.now();
+                if (reason === 'dirty-change' && now - lastSaveRequestAt < 8000) {
+                    if (callback) callback(false);
+                    return;
+                }
+                lastSaveRequestAt = now;
+                saveToLocalStorage(callback, reason || 'autosave');
+            }
+
+            function bestEffortCloseSave() {
+                var now = Date.now();
+                if (now - closeSaveLastAt < 1000) return;
+                closeSaveLastAt = now;
+                queueSave('close-event');
+            }
 
             function restoreFromLocalStorage(fsOverride) {
                 try {
@@ -388,8 +531,15 @@
                         started = true;
                         // Restore save from localStorage
                         setTimeout(restoreFromLocalStorage, 800);
-                        // Auto-save every 30s
-                        setInterval(saveToLocalStorage, 30000);
+                        // Frequent autosave keeps close-to-exit windows small.
+                        if (autoSaveIntervalId) clearInterval(autoSaveIntervalId);
+                        autoSaveIntervalId = setInterval(function () {
+                            queueSave('autosave-interval');
+                        }, 10000);
+                        setTimeout(function () {
+                            dirtyLastFingerprint = getSaveRamFingerprint() || dirtyLastFingerprint;
+                        }, 1300);
+                        setTimeout(startDirtyWatcher, 2500);
                     }
                 }, 300);
 
@@ -544,7 +694,7 @@
                         release(3, 13);
                         saveToLocalStorage(function () {
                             window.location.href = "index.html";
-                        });
+                        }, 'manual-exit');
                     }
                 }, SUPER_LONG_MS);
             });
@@ -552,6 +702,14 @@
                 longHeld = false;
                 clearTimeout(superLongTimer);
                 release(3, 13);
+            });
+
+            window.addEventListener('pagehide', bestEffortCloseSave, true);
+            window.addEventListener('beforeunload', bestEffortCloseSave, true);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'hidden') {
+                    bestEffortCloseSave();
+                }
             });
 
             function storeSaveBytes(fullPath, data) {
@@ -566,11 +724,46 @@
                 } catch(e) { return false; }
             }
 
-            function saveToLocalStorage(callback) {
-                if (!gm || !gm.FS) { if (callback) callback(false); return; }
+            function performSaveToLocalStorage(done) {
+                if (!gm || !gm.FS) { done(false); return; }
+
+                function commitPathIfStable(path, data, cb) {
+                    try {
+                        var first = new Uint8Array(data);
+                        var firstHash = hashBytes(first);
+                        setTimeout(function () {
+                            try {
+                                var secondRaw = gm.FS.readFile(path);
+                                if (!secondRaw || secondRaw.length !== first.length) { cb(false); return; }
+                                var second = new Uint8Array(secondRaw);
+                                if (hashBytes(second) !== firstHash) { cb(false); return; }
+                                cb(storeSaveBytes(path, second));
+                            } catch (e) {
+                                cb(false);
+                            }
+                        }, 220);
+                    } catch (e) {
+                        cb(false);
+                    }
+                }
+
+                function tryCandidates(candidates, idx, cb) {
+                    if (idx >= candidates.length) { cb(false); return; }
+                    var path = candidates[idx];
+                    try {
+                        var d0 = gm.FS.readFile(path);
+                        if (d0 && d0.length >= 64) {
+                            commitPathIfStable(path, d0, function (ok) {
+                                if (ok) cb(true);
+                                else tryCandidates(candidates, idx + 1, cb);
+                            });
+                            return;
+                        }
+                    } catch (e) {}
+                    tryCandidates(candidates, idx + 1, cb);
+                }
 
                 function readFS() {
-                    var ok = false;
                     // Try expected path(s) first so overwrites stay on the same file.
                     try {
                         var savePath = localStorage.getItem('_r1s_' + EJS_gameName + '_path') ||
@@ -580,55 +773,78 @@
                             '/data/saves/' + EJS_gameName + '.srm',
                             '/data/saves/' + EJS_gameName + '.sav'
                         ];
-                        for (var c = 0; c < candidates.length; c++) {
-                            try {
-                                var d0 = gm.FS.readFile(candidates[c]);
-                                if (d0 && d0.length >= 64) {
-                                    ok = storeSaveBytes(candidates[c], d0);
-                                    break;
-                                }
-                            } catch (e) {}
-                        }
-                    } catch (e) {}
+                        tryCandidates(candidates, 0, function (okPrimary) {
+                            if (okPrimary) { done(true); return; }
 
-                    if (ok) {
-                        if (callback) callback(true);
-                        return;
+                            // Read largest valid save file in /data/saves/ (not just first)
+                            try {
+                                var files = gm.FS.readdir('/data/saves/');
+                                var best = null, bestSize = 0;
+                                for (var i = 0; i < files.length; i++) {
+                                    var f = files[i];
+                                    if (f === '.' || f === '..' || f === 'Auto.cache') continue;
+                                    try {
+                                        var fd = gm.FS.readFile('/data/saves/' + f);
+                                        if (fd && fd.length > bestSize && fd.length >= 64) {
+                                            best = { path: '/data/saves/' + f, data: fd };
+                                            bestSize = fd.length;
+                                        }
+                                    } catch(e) {}
+                                }
+                                if (!best) {
+                                    done(false);
+                                    return;
+                                }
+                                commitPathIfStable(best.path, best.data, function (okBest) {
+                                    done(!!okBest);
+                                });
+                            } catch(e) {
+                                done(false);
+                            }
+                        });
+                    } catch (e) {
+                        done(false);
                     }
-
-                    // Read largest valid save file in /data/saves/ (not just first)
-                    try {
-                        var files = gm.FS.readdir('/data/saves/');
-                        var best = null, bestSize = 0;
-                        for (var i = 0; i < files.length; i++) {
-                            var f = files[i];
-                            if (f === '.' || f === '..' || f === 'Auto.cache') continue;
-                            try {
-                                var fd = gm.FS.readFile('/data/saves/' + f);
-                                if (fd && fd.length > bestSize && fd.length >= 64) {
-                                    best = { path: '/data/saves/' + f, data: fd };
-                                    bestSize = fd.length;
-                                }
-                            } catch(e) {}
-                        }
-                        if (best) ok = storeSaveBytes(best.path, best.data);
-                    } catch(e) {}
-                    if (callback) callback(ok);
                 }
 
                 try {
                     var p = gm.saveSaveFiles();
                     if (p && typeof p.then === 'function') {
                         // saveSaveFiles returned a Promise — wait extra for overwrite flush on R1
-                        p.then(function () { setTimeout(readFS, 900); })
-                         .catch(function () { setTimeout(readFS, 2000); });
+                        p.then(function () { setTimeout(readFS, 1200); })
+                         .catch(function () { setTimeout(readFS, 2400); });
                     } else {
                         // No Promise — conservative delay for R1 WASM flush
-                        setTimeout(readFS, 2000);
+                        setTimeout(readFS, 2400);
                     }
                 } catch(e) {
-                    setTimeout(readFS, 2000);
+                    setTimeout(readFS, 2400);
                 }
+            }
+
+            function saveToLocalStorage(callback, reason) {
+                reason = reason || 'autosave';
+                setSaveStatus('Saving...', true);
+                saveQueue = saveQueue
+                    .then(function () {
+                        return new Promise(function (resolve) {
+                            performSaveToLocalStorage(function (ok) {
+                                resolve(!!ok);
+                            });
+                        });
+                    })
+                    .catch(function () {
+                        return false;
+                    });
+
+                saveQueue.then(function (ok) {
+                    if (ok) {
+                        setSaveStatus('Saved', false, 1500);
+                    } else {
+                        setSaveStatus('Save pending', false, 2000);
+                    }
+                    if (callback) callback(!!ok);
+                });
             }
 
             var scrollTimer = null,
