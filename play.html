@@ -467,14 +467,13 @@
             function scheduleDirtySyncAfterSettle() {
                 dirtyLastChangeAt = Date.now();
                 clearTimeout(dirtySettleTimer);
-                setSaveStatus('Save detected', true);
                 dirtySettleTimer = setTimeout(function () {
                     if (!started) return;
                     if (!dirtySyncSettled) {
                         return;
                     }
                     startDirtySyncBurst();
-                }, 1500);
+                }, 2600);
             }
 
             function finishDirtySync(gen, ok) {
